@@ -1,4 +1,4 @@
-const { MongoClient } = require('mongodb');
+inconst { MongoClient } = require('mongodb');
 
 const uri = "mongodb://localhost:27017/trichygold";
 
