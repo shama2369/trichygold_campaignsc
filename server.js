@@ -85,8 +85,22 @@ async function syncTagCounters() {
       if (campaign.channels && Array.isArray(campaign.channels)) {
         campaign.channels.forEach(channel => {
           if (channel.tagNumber && channel.tagNumber.trim() !== '') {
-            const prefix = channel.tagNumber.substring(0, 2);
-            const numberPart = parseInt(channel.tagNumber.substring(2));
+            const tagNumber = channel.tagNumber.trim();
+            
+            // Validate tag number format: must be at least 3 characters (2-char prefix + at least 1 digit)
+            if (tagNumber.length < 3) {
+              console.warn(`Invalid tag number format (too short): "${tagNumber}" in campaign ${campaign.campaignId || 'unknown'}`);
+              return;
+            }
+            
+            const prefix = tagNumber.substring(0, 2);
+            const numberPart = parseInt(tagNumber.substring(2));
+            
+            // Validate that the number part is a valid integer
+            if (isNaN(numberPart) || numberPart < 0) {
+              console.warn(`Invalid tag number format (non-numeric): "${tagNumber}" in campaign ${campaign.campaignId || 'unknown'}`);
+              return;
+            }
             
             if (!tagNumbersByPrefix[prefix]) {
               tagNumbersByPrefix[prefix] = [];
@@ -100,16 +114,23 @@ async function syncTagCounters() {
     // Update counters based on actual saved tags
     for (const [prefix, numbers] of Object.entries(tagNumbersByPrefix)) {
       if (numbers.length > 0) {
-        const maxNumber = Math.max(...numbers);
+        // Filter out any NaN values (shouldn't happen with validation above, but just in case)
+        const validNumbers = numbers.filter(n => !isNaN(n) && n >= 0);
         
-        // Update or create counter
-        await tagCounters.updateOne(
-          { prefix: prefix },
-          { $set: { lastNumber: maxNumber } },
-          { upsert: true }
-        );
-        
-        console.log(`Synced counter for ${prefix} to ${maxNumber}`);
+        if (validNumbers.length > 0) {
+          const maxNumber = Math.max(...validNumbers);
+          
+          // Update or create counter
+          await tagCounters.updateOne(
+            { prefix: prefix },
+            { $set: { lastNumber: maxNumber } },
+            { upsert: true }
+          );
+          
+          console.log(`Synced counter for ${prefix} to ${maxNumber}`);
+        } else {
+          console.warn(`No valid numbers found for prefix ${prefix}, skipping sync`);
+        }
       }
     }
     
@@ -232,7 +253,7 @@ app.post('/api/campaigns', upload.fields([
         const uniqueTags = new Set(tagNumbers);
         if (uniqueTags.size !== tagNumbers.length) {
           return res.status(400).json({ 
-            error: 'Duplicate tag numbers found within the campaign. Each tag number must be unique.' 
+            error: 'Duplicate reference codes found within the campaign. Each reference code must be unique.' 
           });
         }
         
@@ -261,7 +282,7 @@ app.post('/api/campaigns', upload.fields([
         if (duplicateTags.length > 0) {
           console.log(`Create: Duplicate tags found: ${duplicateTags.join(', ')}`);
           return res.status(400).json({ 
-            error: `Tag number(s) already exist: ${duplicateTags.join(', ')}. Each tag number must be globally unique.` 
+            error: `Reference code(s) already exist: ${duplicateTags.join(', ')}. Each reference code must be globally unique.` 
           });
         }
         
@@ -315,7 +336,7 @@ app.put('/api/campaigns/:campaignId', async (req, res) => {
         const uniqueTags = new Set(tagNumbers);
         if (uniqueTags.size !== tagNumbers.length) {
           return res.status(400).json({ 
-            error: 'Duplicate tag numbers found within the campaign. Each tag number must be unique.' 
+            error: 'Duplicate reference codes found within the campaign. Each reference code must be unique.' 
           });
         }
         
@@ -346,7 +367,7 @@ app.put('/api/campaigns/:campaignId', async (req, res) => {
         if (duplicateTags.length > 0) {
           console.log(`Update: Duplicate tags found: ${duplicateTags.join(', ')}`);
           return res.status(400).json({ 
-            error: `Tag number(s) already exist: ${duplicateTags.join(', ')}. Each tag number must be globally unique.` 
+            error: `Reference code(s) already exist: ${duplicateTags.join(', ')}. Each reference code must be globally unique.` 
           });
         }
         
@@ -404,7 +425,7 @@ app.get('/api/campaigns/tag/:tagNumber', async (req, res) => {
     
     if (campaignsWithTag.length === 0) {
       return res.status(404).json({ 
-        message: `No campaigns found using tag number: ${tagNumber}` 
+        message: `No campaigns found using reference code: ${tagNumber}` 
       });
     }
     
@@ -453,8 +474,8 @@ app.get('/api/campaigns/:campaignId/export', async (req, res) => {
         let baseInfo = '';
         if (channel.type === 'Social Media') {
           baseInfo = `Social Media: ${channel.platform}, ${channel.adName}, ${channel.cost} AED, ${channel.adType}`;
-        } else if (channel.type === 'TV') {
-          baseInfo = `TV: ${channel.network || ''}, ${channel.adName}, ${channel.cost} AED`;
+        } else if (channel.type === 'Television') {
+          baseInfo = `Television: ${channel.adName}, ${channel.cost} AED`;
         } else if (channel.type === 'Print Media') {
           baseInfo = `Print Media: ${channel.publication}, ${channel.adName}, ${channel.cost} AED`;
         } else if (channel.type === 'Radio') {
@@ -470,7 +491,7 @@ app.get('/api/campaigns/:campaignId/export', async (req, res) => {
         
         // Add tag number if available
         if (channel.tagNumber) {
-          baseInfo += `, Tag: ${channel.tagNumber}`;
+          baseInfo += `, Reference Code: ${channel.tagNumber}`;
         }
         
         return baseInfo;
@@ -528,12 +549,20 @@ app.get('/api/campaigns/export', async (req, res) => {
         let baseInfo = '';
         if (channel.type === 'Social Media') {
           baseInfo = `Social Media: ${channel.platform}, ${channel.adName}, ${channel.cost} AED, ${channel.adType}`;
-        } else if (channel.type === 'TV') {
-          baseInfo = `TV: ${channel.network || ''}, ${channel.adName}, ${channel.cost} AED`;
+        } else if (channel.type === 'Television') {
+          baseInfo = `Television: ${channel.adName}, ${channel.cost} AED`;
         } else if (channel.type === 'Print Media') {
           baseInfo = `Print Media: ${channel.publication}, ${channel.adName}, ${channel.cost} AED`;
         } else if (channel.type === 'Radio') {
           baseInfo = `Radio: ${channel.station || ''}, ${channel.adName}, ${channel.cost} AED`;
+        } else if (channel.type === 'Storefront') {
+          baseInfo = `Storefront: ${channel.platform || ''}, ${channel.adName}, ${channel.cost} AED`;
+        } else if (channel.type === 'Email') {
+          baseInfo = `Email: ${channel.platform || ''}, ${channel.adName}, ${channel.cost} AED`;
+        } else if (channel.type === 'YouTube') {
+          baseInfo = `YouTube: ${channel.platform || ''}, ${channel.adName}, ${channel.cost} AED`;
+        } else if (channel.type === 'WhatsApp Group') {
+          baseInfo = `WhatsApp Group: ${channel.platform || ''}, ${channel.adName}, ${channel.cost} AED`;
         } else {
           baseInfo = `${channel.type}: ${channel.adName}, ${channel.cost} AED`;
         }
@@ -545,7 +574,7 @@ app.get('/api/campaigns/export', async (req, res) => {
         
         // Add tag number if available
         if (channel.tagNumber) {
-          baseInfo += `, Tag: ${channel.tagNumber}`;
+          baseInfo += `, Reference Code: ${channel.tagNumber}`;
         }
         
         return baseInfo;
@@ -586,7 +615,7 @@ app.get('/api/campaigns/tag/:tagNumber', async (req, res) => {
     console.log(`Found ${matchingCampaigns.length} campaigns with tag ${tagNumber}`);
     
     if (matchingCampaigns.length === 0) {
-      return res.status(404).json({ error: 'No campaigns found with this tag number' });
+      return res.status(404).json({ error: 'No campaigns found with this reference code' });
     }
     
     res.json({
@@ -665,7 +694,7 @@ app.put('/api/campaigns/impressions/:tagNumber', async (req, res) => {
     console.log(`Update result: matched=${result.matchedCount}, modified=${result.modifiedCount}`);
     
     if (result.matchedCount === 0) {
-      return res.status(404).json({ error: 'No campaign found with this tag number' });
+      return res.status(404).json({ error: 'No campaign found with this reference code' });
     }
     
     if (result.modifiedCount === 0) {
@@ -764,18 +793,35 @@ app.get('/api/tags/counters', async (req, res) => {
         'IG': 'Instagram',
         'FB': 'Facebook', 
         'TT': 'TikTok',
+        'YT': 'YouTube',
+        'SC': 'Snapchat',
         'GG': 'Google',
-        'WA': 'Whatsup group',
-        'OS': 'Other Social',
-        'PM': 'Print Media',
-        'TV': 'TV',
-        'RD': 'Radio',
+        'WA': 'WhatsApp Group',
+        'GT': 'Gold councils',
+        'RC': 'Residential Community',
+        'LC': 'Lang/Cultural group',
+        'RG': 'Religious group',
+        'BC': 'Bluecollar Camp',
+        'NC': 'Neighbourhood Community',
+        'SO': 'Social organisations',
+        'EV': 'Event',
+        'EX': 'Exhibition',
+        'CP': 'Channel Partners',
+        'CO': 'Corporate Partners',
+        'HT': 'Hotel',
+        'TD': 'Tour Driver',
+        'TC': 'Tours&Travel Agency',
+        'PL': 'New collection Launch',
+        'WS': 'Website',
         'EM': 'Email',
-        'MSG': 'Message',
-        'OE': 'Outdoor Events',
-        'PI': 'Promotional Items',
-        'PO': 'Promotional Offer',
-        'OT': 'Other'
+        'SMS': 'SMS',
+        'PM': 'Print Media',
+        'RD': 'Radio',
+        'TV': 'Television',
+        'RF': 'Referral',
+        'SF': 'Storefront',
+        'OA': 'Outdoor Ads',
+        'OT': 'Others'
       };
       return platformMap[prefix] || prefix;
     }
@@ -785,7 +831,7 @@ app.get('/api/tags/counters', async (req, res) => {
       prefix: counter.prefix,
       platformName: getPlatformName(counter.prefix),
       lastNumber: counter.lastNumber,
-      nextTag: `${counter.prefix}${String(counter.lastNumber + 1).padStart(4, '0')}`
+      nextTag: `${counter.prefix}${String(counter.lastNumber + 1).padStart(5, '0')}`
     }));
     
     res.json({
@@ -802,47 +848,89 @@ app.get('/api/tags/counters', async (req, res) => {
 app.post('/api/tags/generate', async (req, res) => {
   const { channelType, platform } = req.body;
   
-  console.log('Tag generation request:', { channelType, platform });
+  // Trim whitespace from channelType
+  const trimmedChannelType = channelType ? channelType.trim() : '';
+  
+  console.log('Tag generation request:', { channelType: trimmedChannelType, platform });
   console.log('Platform type:', typeof platform);
   console.log('Platform length:', platform ? platform.length : 'null');
   console.log('Platform exact match with Whatsup group:', platform === 'Whatsup group');
   
+  if (!trimmedChannelType) {
+    return res.status(400).json({ error: 'Please select a channel type' });
+  }
+  
   try {
     // Determine prefix based on channel type and platform
     let prefix = '';
-    if (channelType === 'Social Media') {
-      if (platform === 'Instagram') prefix = 'IG';
-      else if (platform === 'Facebook') prefix = 'FB';
-      else if (platform === 'TikTok') prefix = 'TT';
-      else if (platform === 'Google') prefix = 'GG';
-      else if (platform === 'Whatsup group' || platform?.trim() === 'Whatsup group' || platform?.includes('Whatsup')) prefix = 'WA';
-      else if (platform === 'Other') prefix = 'OS';
-      else {
-        // If no platform selected, return error
-        console.log('Unknown platform for Social Media:', platform);
-        return res.status(400).json({ error: 'Please select a platform for Social Media' });
-      }
-    } else if (channelType === 'Print Media') {
-      prefix = 'PM';
-    } else if (channelType === 'TV') {
-      prefix = 'TV';
-    } else if (channelType === 'Radio') {
-      prefix = 'RD';
-    } else if (channelType === 'Email') {
+    if (trimmedChannelType === 'Instagram') {
+      prefix = 'IG';
+    } else if (trimmedChannelType === 'Facebook') {
+      prefix = 'FB';
+    } else if (trimmedChannelType === 'TikTok') {
+      prefix = 'TT';
+    } else if (trimmedChannelType === 'YouTube') {
+      prefix = 'YT';
+    } else if (trimmedChannelType === 'Snapchat') {
+      prefix = 'SC';
+    } else if (trimmedChannelType === 'Google') {
+      prefix = 'GG';
+    } else if (trimmedChannelType === 'WhatsApp Group') {
+      prefix = 'WA';
+    } else if (trimmedChannelType === 'Gold councils') {
+      prefix = 'GT';
+    } else if (trimmedChannelType === 'Residential Community') {
+      prefix = 'RC';
+    } else if (trimmedChannelType === 'Lang/Cultural group') {
+      prefix = 'LC';
+    } else if (trimmedChannelType === 'Religious group') {
+      prefix = 'RG';
+    } else if (trimmedChannelType === 'Bluecollar Camp') {
+      prefix = 'BC';
+    } else if (trimmedChannelType === 'Neighbourhood Community') {
+      prefix = 'NC';
+    } else if (trimmedChannelType === 'Social organisations') {
+      prefix = 'SO';
+    } else if (trimmedChannelType === 'Event') {
+      prefix = 'EV';
+    } else if (trimmedChannelType === 'Exhibition') {
+      prefix = 'EX';
+    } else if (trimmedChannelType === 'Channel Partners') {
+      prefix = 'CP';
+    } else if (trimmedChannelType === 'Corporate Partners') {
+      prefix = 'CO';
+    } else if (trimmedChannelType === 'Hotel') {
+      prefix = 'HT';
+    } else if (trimmedChannelType === 'Tour Driver') {
+      prefix = 'TD';
+    } else if (trimmedChannelType === 'Tours&Travel Agency') {
+      prefix = 'TC';
+    } else if (trimmedChannelType === 'New collection Launch') {
+      prefix = 'PL';
+    } else if (trimmedChannelType === 'Website') {
+      prefix = 'WS';
+    } else if (trimmedChannelType === 'Email') {
       prefix = 'EM';
-    } else if (channelType === 'Message') {
-      prefix = 'MSG';
-    } else if (channelType === 'Outdoor Events') {
-      prefix = 'OE';
-    } else if (channelType === 'Promotional Items') {
-      prefix = 'PI';
-    } else if (channelType === 'Promotional Offer') {
-      prefix = 'PO';
-    } else if (channelType === 'Other') {
+    } else if (trimmedChannelType === 'SMS') {
+      prefix = 'SMS';
+    } else if (trimmedChannelType === 'Print Media') {
+      prefix = 'PM';
+    } else if (trimmedChannelType === 'Radio') {
+      prefix = 'RD';
+    } else if (trimmedChannelType === 'Television') {
+      prefix = 'TV';
+    } else if (trimmedChannelType === 'Referral') {
+      prefix = 'RF';
+    } else if (trimmedChannelType === 'Storefront') {
+      prefix = 'SF';
+    } else if (trimmedChannelType === 'Outdoor Ads') {
+      prefix = 'OA';
+    } else if (trimmedChannelType === 'Others') {
       prefix = 'OT';
     } else {
       // If no channel type selected, return error
-      return res.status(400).json({ error: 'Please select a channel type' });
+      console.error('Unknown channel type:', trimmedChannelType);
+      return res.status(400).json({ error: `Unknown channel type: ${trimmedChannelType}. Please select a valid channel type.` });
     }
     
     const tagCounters = db.collection('tagCounters');
@@ -858,7 +946,7 @@ app.post('/api/tags/generate', async (req, res) => {
     
     // Generate next tag number (last saved + 1)
     const nextNumber = counter.lastNumber + 1;
-    const newTagNumber = `${prefix}${String(nextNumber).padStart(4, '0')}`;
+    const newTagNumber = `${prefix}${String(nextNumber).padStart(5, '0')}`;
     
     // Check if this tag number already exists in any campaign
     const campaigns = db.collection('campaigns');
@@ -869,7 +957,7 @@ app.post('/api/tags/generate', async (req, res) => {
     if (existingTag) {
       // If tag exists, increment counter and try again
       const incrementedNumber = nextNumber + 1;
-      const incrementedTagNumber = `${prefix}${String(incrementedNumber).padStart(4, '0')}`;
+      const incrementedTagNumber = `${prefix}${String(incrementedNumber).padStart(5, '0')}`;
       
       console.log(`Tag ${newTagNumber} already exists, generating ${incrementedTagNumber} instead`);
       
@@ -991,6 +1079,242 @@ app.use(express.static('.'));
 app.use('/public', express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static('uploads'));
 
+// ==================== Channel Collection API Endpoints ====================
+
+// POST: Create a new channel
+app.post('/api/channels', async (req, res) => {
+  try {
+    const { channel_type, channel_tag, add_tag, Mobile_no, Tot_conversions, Company_name } = req.body;
+    
+    // Validate required fields
+    if (!channel_type) {
+      return res.status(400).json({ error: 'channel_type is required' });
+    }
+    
+    // Generate unique channel_id
+    const channel_id = await getNextChannelId();
+    
+    const channel = {
+      channel_id,
+      channel_type,
+      channel_tag: channel_tag || '',
+      add_tag: add_tag || '',
+      Mobile_no: Mobile_no || '',
+      Tot_conversions: Tot_conversions || 0,
+      Company_name: Company_name || '',
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    const channels = db.collection('channels');
+    await channels.insertOne(channel);
+    
+    console.log(`Created new channel: ${channel_id}`);
+    res.status(201).json(channel);
+  } catch (err) {
+    console.error('Error creating channel:', err);
+    if (err.code === 11000) {
+      res.status(409).json({ error: 'Channel ID already exists' });
+    } else {
+      res.status(500).json({ error: 'Server error' });
+    }
+  }
+});
+
+// GET: Get all channels
+app.get('/api/channels', async (req, res) => {
+  try {
+    const channels = db.collection('channels');
+    const allChannels = await channels.find({}).sort({ createdAt: -1 }).toArray();
+    res.json(allChannels);
+  } catch (err) {
+    console.error('Error fetching channels:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// GET: Get all unique channel tags (MUST be before /api/channels/:id route)
+// Optional query parameter: channel_type - filters tags by channel type
+app.get('/api/channels/tags', async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({ error: 'Database not connected', tags: [] });
+    }
+    
+    const channels = db.collection('channels');
+    const { channel_type } = req.query;
+    
+    // Build query filter
+    const query = {};
+    if (channel_type && channel_type.trim() !== '') {
+      query.channel_type = channel_type.trim();
+    }
+    
+    const allChannels = await channels.find(query).toArray();
+    
+    // Extract unique channel tags (filter out empty/null values)
+    const uniqueTags = [...new Set(
+      allChannels
+        .map(channel => channel.channel_tag)
+        .filter(tag => tag && tag.trim() !== '')
+    )].sort();
+    
+    res.json({ tags: uniqueTags });
+  } catch (err) {
+    console.error('Error fetching channel tags:', err);
+    // Return empty array instead of error to prevent UI issues
+    res.json({ tags: [] });
+  }
+});
+
+// GET: Get all unique channel tags from campaigns (marketing records)
+app.get('/api/campaigns/channel-tags', async (req, res) => {
+  try {
+    if (!db) {
+      return res.status(503).json({ error: 'Database not connected', tags: [] });
+    }
+    
+    const campaigns = db.collection('campaigns');
+    const allCampaigns = await campaigns.find({}).toArray();
+    
+    // Extract unique channel tags from all campaigns
+    const uniqueTags = new Set();
+    allCampaigns.forEach(campaign => {
+      if (campaign.channels && Array.isArray(campaign.channels)) {
+        campaign.channels.forEach(channel => {
+          if (channel.channelTag && channel.channelTag.trim() !== '') {
+            uniqueTags.add(channel.channelTag.trim());
+          }
+        });
+      }
+    });
+    
+    res.json({ tags: Array.from(uniqueTags).sort() });
+  } catch (err) {
+    console.error('Error fetching channel tags from campaigns:', err);
+    res.json({ tags: [] });
+  }
+});
+
+// GET: Get a specific channel by ID
+app.get('/api/channels/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const channels = db.collection('channels');
+    
+    // Try to find by channel_id first, then by _id
+    let channel = await channels.findOne({ channel_id: id });
+    if (!channel) {
+      try {
+        channel = await channels.findOne({ _id: new ObjectId(id) });
+      } catch (e) {
+        // Invalid ObjectId format
+      }
+    }
+    
+    if (!channel) {
+      return res.status(404).json({ error: 'Channel not found' });
+    }
+    
+    res.json(channel);
+  } catch (err) {
+    console.error('Error fetching channel:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT: Update a channel
+app.put('/api/channels/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { channel_type, channel_tag, add_tag, Mobile_no, Tot_conversions, Company_name } = req.body;
+    
+    const channels = db.collection('channels');
+    
+    // Build update object
+    const updateData = {
+      updatedAt: new Date()
+    };
+    
+    if (channel_type !== undefined) updateData.channel_type = channel_type;
+    if (channel_tag !== undefined) updateData.channel_tag = channel_tag;
+    if (add_tag !== undefined) updateData.add_tag = add_tag;
+    if (Mobile_no !== undefined) updateData.Mobile_no = Mobile_no;
+    if (Tot_conversions !== undefined) updateData.Tot_conversions = Tot_conversions;
+    if (Company_name !== undefined) updateData.Company_name = Company_name;
+    
+    // Try to find by channel_id first, then by _id
+    let query = { channel_id: id };
+    let channel = await channels.findOne(query);
+    
+    if (!channel) {
+      try {
+        query = { _id: new ObjectId(id) };
+        channel = await channels.findOne(query);
+      } catch (e) {
+        // Invalid ObjectId format
+      }
+    }
+    
+    if (!channel) {
+      return res.status(404).json({ error: 'Channel not found' });
+    }
+    
+    const result = await channels.updateOne(
+      query,
+      { $set: updateData }
+    );
+    
+    if (result.modifiedCount === 0) {
+      return res.status(404).json({ error: 'Channel not found or no changes made' });
+    }
+    
+    const updatedChannel = await channels.findOne(query);
+    console.log(`Updated channel: ${id}`);
+    res.json(updatedChannel);
+  } catch (err) {
+    console.error('Error updating channel:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE: Delete a channel
+app.delete('/api/channels/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const channels = db.collection('channels');
+    
+    // Try to find by channel_id first, then by _id
+    let query = { channel_id: id };
+    let channel = await channels.findOne(query);
+    
+    if (!channel) {
+      try {
+        query = { _id: new ObjectId(id) };
+        channel = await channels.findOne(query);
+      } catch (e) {
+        // Invalid ObjectId format
+      }
+    }
+    
+    if (!channel) {
+      return res.status(404).json({ error: 'Channel not found' });
+    }
+    
+    const result = await channels.deleteOne(query);
+    
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ error: 'Channel not found' });
+    }
+    
+    console.log(`Deleted channel: ${id}`);
+    res.json({ message: 'Channel deleted successfully', channel_id: id });
+  } catch (err) {
+    console.error('Error deleting channel:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
@@ -1032,6 +1356,9 @@ async function setupDatabase() {
       const tagCounters = db.collection('tagCounters');
       await tagCounters.createIndex({ prefix: 1 }, { unique: true });
       console.log('Unique index on tagCounters created');
+      const channels = db.collection('channels');
+      await channels.createIndex({ channel_id: 1 }, { unique: true });
+      console.log('Unique index on channels.channel_id created');
       return;
     } catch (err) {
       console.error(`MongoDB connection failed (Attempt ${4 - retries}):`, err.message);
@@ -1045,7 +1372,7 @@ async function setupDatabase() {
   }
 }
 
-// Generate Marketing ID using a persistent counter (5-digit format: MAK_00001, MAK_00002, etc.)
+// Generate Marketing ID using a persistent counter (6-digit format: MK_000001, MK_000002, etc.)
 async function getNextCampaignId() {
   try {
     const counters = db.collection('counters');
@@ -1076,11 +1403,45 @@ async function getNextCampaignId() {
       console.log('Fallback nextId:', nextId);
     }
     
-    const campaignId = `MAK_${nextId.toString().padStart(5, '0')}`;
-    console.log(`Generated marketing ID: ${campaignId} (5-digit format)`);
+    const campaignId = `MK_${nextId.toString().padStart(6, '0')}`;
+    console.log(`Generated marketing ID: ${campaignId} (6-digit format)`);
     return campaignId;
   } catch (err) {
     console.error('Error generating persistent campaignId:', err);
+    throw err;
+  }
+}
+
+// Generate Channel ID using a persistent counter (6-digit format: CH_000001, CH_000002, etc.)
+async function getNextChannelId() {
+  try {
+    const counters = db.collection('counters');
+    console.log('Getting next channel ID from persistent counter...');
+    
+    // Atomically increment the counter and get the new value
+    const result = await counters.findOneAndUpdate(
+      { _id: 'channelId' },
+      { $inc: { lastNumber: 1 } },
+      { upsert: true, returnDocument: 'after' }
+    );
+    
+    // Handle different MongoDB driver versions
+    let nextId;
+    if (result && result.value) {
+      nextId = result.value.lastNumber;
+    } else if (result && result.lastNumber) {
+      nextId = result.lastNumber;
+    } else {
+      // Fallback: get the current value
+      const currentDoc = await counters.findOne({ _id: 'channelId' });
+      nextId = currentDoc ? currentDoc.lastNumber : 1;
+    }
+    
+    const channelId = `CH_${nextId.toString().padStart(6, '0')}`;
+    console.log(`Generated channel ID: ${channelId} (6-digit format)`);
+    return channelId;
+  } catch (err) {
+    console.error('Error generating persistent channelId:', err);
     throw err;
   }
 }
