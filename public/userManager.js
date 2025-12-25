@@ -75,10 +75,6 @@ function canExportData() {
   return window.sessionManager ? window.sessionManager.canExportData() : false;
 }
 
-function canGenerateTags() {
-  return window.sessionManager ? window.sessionManager.canGenerateTags() : false;
-}
-
 function canManageChannels() {
   return window.sessionManager ? window.sessionManager.canManageChannels() : false;
 }
@@ -350,10 +346,17 @@ document.addEventListener('DOMContentLoaded', function () {
   function showUserSection() {
     userSection.classList.remove('hidden');
     roleSection.classList.add('hidden');
+    const employeeSection = document.getElementById('user-manager-employee-section');
+    if (employeeSection) employeeSection.classList.add('hidden');
     toggleUserBtn.classList.add('btn-primary');
     toggleUserBtn.classList.remove('btn-secondary');
     toggleRoleBtn.classList.add('btn-secondary');
     toggleRoleBtn.classList.remove('btn-primary');
+    const toggleEmployeeBtn = document.getElementById('toggleEmployeeBtn');
+    if (toggleEmployeeBtn) {
+      toggleEmployeeBtn.classList.add('btn-secondary');
+      toggleEmployeeBtn.classList.remove('btn-primary');
+    }
     userTableSection.classList.remove('hidden');
     userCreateFormSection.classList.add('hidden');
     renderUsersTable();
@@ -362,10 +365,17 @@ document.addEventListener('DOMContentLoaded', function () {
   function showRoleSection() {
     userSection.classList.add('hidden');
     roleSection.classList.remove('hidden');
+    const employeeSection = document.getElementById('user-manager-employee-section');
+    if (employeeSection) employeeSection.classList.add('hidden');
     toggleUserBtn.classList.add('btn-secondary');
     toggleUserBtn.classList.remove('btn-primary');
     toggleRoleBtn.classList.add('btn-primary');
     toggleRoleBtn.classList.remove('btn-secondary');
+    const toggleEmployeeBtn = document.getElementById('toggleEmployeeBtn');
+    if (toggleEmployeeBtn) {
+      toggleEmployeeBtn.classList.add('btn-secondary');
+      toggleEmployeeBtn.classList.remove('btn-primary');
+    }
     // Show roles table by default, hide create form
     document.getElementById('role-create-form-container').classList.add('hidden');
     document.getElementById('roles-table-container').classList.remove('hidden');
@@ -446,7 +456,7 @@ document.addEventListener('DOMContentLoaded', function () {
       const allPermissions = [
         'create_campaigns', 'edit_campaigns', 'delete_campaigns', 'view_campaigns',
         'view_reports', 'export_data', 'manage_users', 'manage_roles', 
-        'generate_tags', 'manage_channels'
+        'manage_channels'
       ];
       
       allPermissions.forEach(perm => {

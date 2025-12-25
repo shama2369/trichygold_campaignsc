@@ -309,24 +309,24 @@
               <th><input type="text" id="filter-campaign-name" placeholder="Filter Name" class="form-control form-control-sm"></th>
               <th><input type="text" id="filter-offers" placeholder="Filter Description" class="form-control form-control-sm"></th>
               <th style="min-height: 80px; vertical-align: top;">
-                <div class="text-xs text-gray-600 mb-1 text-center">Work Start Date Range</div>
+                <div class="text-xs text-gray-600 mb-1 text-center" style="font-weight: normal;">Range</div>
                 <div class="space-y-1">
-                  <input type="date" id="filter-work-start-date-from" class="form-control form-control-sm w-full" placeholder="From Date" style="display: block !important; margin-bottom: 4px;">
-                  <input type="date" id="filter-work-start-date-to" class="form-control form-control-sm w-full" placeholder="To Date" style="display: block !important;">
+                  <input type="date" id="filter-work-start-date-from" class="form-control form-control-sm w-full" placeholder="From Date" style="display: block !important; margin-bottom: 4px; font-weight: normal;">
+                  <input type="date" id="filter-work-start-date-to" class="form-control form-control-sm w-full" placeholder="To Date" style="display: block !important; font-weight: normal;">
                 </div>
               </th>
               <th style="min-height: 80px; vertical-align: top;">
-                <div class="text-xs text-gray-600 mb-1 text-center">Start Date Range</div>
+                <div class="text-xs text-gray-600 mb-1 text-center" style="font-weight: normal;">Range</div>
                 <div class="space-y-1">
-                  <input type="date" id="filter-start-date-from" class="form-control form-control-sm w-full" placeholder="From Date" style="display: block !important; margin-bottom: 4px;">
-                  <input type="date" id="filter-start-date-to" class="form-control form-control-sm w-full" placeholder="To Date" style="display: block !important;">
+                  <input type="date" id="filter-start-date-from" class="form-control form-control-sm w-full" placeholder="From Date" style="display: block !important; margin-bottom: 4px; font-weight: normal;">
+                  <input type="date" id="filter-start-date-to" class="form-control form-control-sm w-full" placeholder="To Date" style="display: block !important; font-weight: normal;">
                 </div>
               </th>
               <th style="min-height: 80px; vertical-align: top;">
-                <div class="text-xs text-gray-600 mb-1 text-center">End Date Range</div>
+                <div class="text-xs text-gray-600 mb-1 text-center" style="font-weight: normal;">Range</div>
                 <div class="space-y-1">
-                  <input type="date" id="filter-end-date-from" class="form-control form-control-sm w-full" placeholder="From Date" style="display: block !important; margin-bottom: 4px;">
-                  <input type="date" id="filter-end-date-to" class="form-control form-control-sm w-full" placeholder="To Date" style="display: block !important;">
+                  <input type="date" id="filter-end-date-from" class="form-control form-control-sm w-full" placeholder="From Date" style="display: block !important; margin-bottom: 4px; font-weight: normal;">
+                  <input type="date" id="filter-end-date-to" class="form-control form-control-sm w-full" placeholder="To Date" style="display: block !important; font-weight: normal;">
                 </div>
               </th>
               <th>
@@ -775,7 +775,7 @@
 
     <!-- Export Section -->
     <div id="export-campaign" class="section hidden">
-      <h2 class="text-lg font-semibold text-purple-700 mb-4">Export All Campaigns to Excel</h2>
+      <h2 class="text-lg font-semibold text-purple-700 mb-4">Export All Marketing Records to Excel</h2>
               <button onclick="exportCampaigns()" class="btn-primary w-full py-2 rounded-md">Export Table</button>
     </div>
 
@@ -783,25 +783,29 @@
     <div id="impression-tracking" class="section hidden">
       <h2 class="text-lg font-semibold text-purple-700 mb-4">Impression & Conversion Tracking & Analytics</h2>
       
-      <!-- Impression Statistics -->
+      <!-- Function Buttons with Descriptions -->
       <div class="mb-6">
+        <p class="text-base font-medium text-gray-700 mb-4">Select a function below to view or manage impression data.</p>
+        <div class="flex flex-wrap gap-4 mb-4 justify-center">
+          <button onclick="toggleImpressionSection('overallStats')" class="btn-primary py-2 px-4 rounded-lg text-xs w-24" title="View summary total impressions, conversions, and channel breakdowns">📊 Stats</button>
+          <button onclick="toggleImpressionSection('updateImpressions')" class="btn-primary py-2 px-4 rounded-lg text-xs w-24" title="Edit impression and conversion for channels by Marketing ID">✏️ Update</button>
+          <button onclick="toggleImpressionSection('searchByTag')" class="btn-primary py-2 px-4 rounded-lg text-xs w-24" title="Find channels and marketing initiatives by searching with Reference Code (tag number)">🔍 Search</button>
+          <button onclick="toggleImpressionSection('tagCounters')" class="btn-primary py-2 px-4 rounded-lg text-xs w-24" title="View Reference Code counters showing the last used number">🔢 Counters</button>
+          <button onclick="toggleImpressionSection('priorityChannels')" class="btn-primary py-2 px-4 rounded-lg text-xs w-24" title="View priority channels with total impressions and conversions grouped from marketing records">⭐ Priority</button>
+        </div>
+      </div>
+
+      <!-- Impression Statistics -->
+      <div id="overallStats" class="mb-6 hidden">
         <h3 class="text-md font-medium text-blue-600 mb-3">📊 Overall Statistics</h3>
         <button onclick="loadImpressionStats()" class="btn-secondary mb-4 py-2 px-4 rounded-md">Refresh Statistics</button>
-        <div id="impressionStats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div id="impressionStats">
           <!-- Stats will be loaded here -->
         </div>
       </div>
 
-      <!-- Top Performing Channels -->
-      <div class="mb-6">
-        <h3 class="text-md font-medium text-green-600 mb-3">🏆 Top Performing Channels</h3>
-        <div id="topChannels" class="bg-white p-4 rounded-lg border border-gray-200">
-          <!-- Top channels will be loaded here -->
-        </div>
-      </div>
-
       <!-- Update Impressions -->
-      <div class="mb-6">
+      <div id="updateImpressions" class="mb-6 hidden">
         <h3 class="text-md font-medium text-orange-600 mb-3">✏️ Update Impressions</h3>
         <div class="bg-white p-4 rounded-lg border border-gray-200">
           <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -810,7 +814,41 @@
               <input id="updateCampaignId" type="text" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="e.g., MK_000001">
             </div>
             <div class="flex items-end">
-              <button onclick="loadCampaignChannels()" class="btn-secondary py-2 px-4 rounded-md">Load Channels</button>
+              <button onclick="loadCampaignChannels()" class="btn-secondary py-2 px-4 rounded-md">Load Campaign</button>
+            </div>
+          </div>
+          
+          <!-- Marketing Achieved Impressions and Conversions -->
+          <div id="marketingAchievedDisplay" class="hidden mt-4 mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h4 class="text-sm font-medium text-blue-700 mb-3">Marketing Achieved Impressions & Conversions</h4>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div>
+                <p class="text-sm font-medium text-gray-700 mb-1">Current Impressions</p>
+                <p class="text-lg font-bold text-blue-600" id="currentMarketingImpressions">0</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">New Impressions</label>
+                <input type="number" 
+                       id="marketingImpressions" 
+                       class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                       placeholder="Enter new value" 
+                       min="0">
+              </div>
+              <div>
+                <p class="text-sm font-medium text-gray-700 mb-1">Current Conversions</p>
+                <p class="text-lg font-bold text-green-600" id="currentMarketingConversions">0</p>
+              </div>
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">New Conversions</label>
+                <input type="number" 
+                       id="marketingConversions" 
+                       class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-green-500" 
+                       placeholder="Enter new value" 
+                       min="0">
+              </div>
+            </div>
+            <div class="mt-4">
+              <button onclick="updateMarketingAchieved()" class="btn-primary py-2 px-4 rounded-md">Update Marketing Achieved</button>
             </div>
           </div>
           
@@ -825,19 +863,16 @@
       </div>
 
       <!-- Tag Search -->
-      <div class="mb-6">
+      <div id="searchByTag" class="mb-6 hidden">
         <h3 class="text-md font-medium text-indigo-600 mb-3">🔍 Search by Reference Code</h3>
         <div class="bg-white p-4 rounded-lg border border-gray-200">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
               <label for="searchTagNumber" class="block text-sm font-medium text-purple-700">Reference Code</label>
               <input id="searchTagNumber" type="text" class="w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="e.g., IG00001, FB00002">
             </div>
             <div class="flex items-end">
               <button onclick="searchByTag()" class="btn-primary py-2 px-4 rounded-md">Search</button>
-            </div>
-            <div class="flex items-end">
-              <button onclick="loadAllTags()" class="btn-secondary py-2 px-4 rounded-md">View All Tags</button>
             </div>
           </div>
           <div id="tagSearchResults" class="mt-4">
@@ -847,23 +882,25 @@
       </div>
 
       <!-- Tag Counters -->
-      <div class="mb-6">
+      <div id="tagCounters" class="mb-6 hidden">
         <h3 class="text-md font-medium text-teal-600 mb-3">🔢 Reference Code Counters</h3>
         <div class="bg-white p-4 rounded-lg border border-gray-200">
           <button onclick="loadTagCounters()" class="btn-secondary mb-4 py-2 px-4 rounded-md">Refresh Counters</button>
-          <div id="tagCounters" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div id="tagCountersContent" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
             <!-- Tag counters will be displayed here -->
           </div>
         </div>
       </div>
 
-      <!-- Campaign Impressions List -->
-      <div class="mb-6">
-        <h3 class="text-md font-medium text-pink-600 mb-3">📋 All Marketing Records with Impressions</h3>
-        <div id="campaignImpressionsList" class="bg-white p-4 rounded-lg border border-gray-200">
-          <!-- Campaign list will be loaded here -->
+      <!-- Priority Channels -->
+      <div id="priorityChannels" class="mb-6 hidden">
+        <div class="bg-white p-4 rounded-lg border border-gray-200">
+          <div id="priority-channels-content">
+            <p class="text-gray-600">Loading priority channels data...</p>
         </div>
       </div>
+      </div>
+
     </div>
 
     <!-- User & Role Manager Section -->
@@ -872,6 +909,7 @@
           <div class="flex gap-4 mb-6">
         <button id="toggleUserBtn" class="btn-primary px-6 py-3 rounded-md font-medium text-lg w-[180px]">User</button>
         <button id="toggleRoleBtn" class="btn-secondary px-6 py-3 rounded-md font-medium text-lg w-[180px]">Role</button>
+        <button id="toggleEmployeeBtn" class="btn-secondary px-6 py-3 rounded-md font-medium text-lg w-[180px]">Employee</button>
           </div>
           <div id="user-manager-user-section">
                       <div class="flex gap-4 mb-6">
@@ -973,10 +1011,6 @@
                 <div class="flex items-center">
                   <input type="checkbox" id="perm_manage_roles" name="permissions" value="manage_roles" class="mr-3">
                   <label for="perm_manage_roles" class="text-sm">Manage Roles</label>
-          </div>
-                <div class="flex items-center">
-                  <input type="checkbox" id="perm_generate_tags" name="permissions" value="generate_tags" class="mr-3">
-                  <label for="perm_generate_tags" class="text-sm">Generate Tags</label>
             </div>
                 <div class="flex items-center">
                   <input type="checkbox" id="perm_manage_channels" name="permissions" value="manage_channels" class="mr-3">
@@ -1010,9 +1044,105 @@
           </div>
         </div>
       </div>
+      
+      <!-- Employee Manager Section -->
+      <div id="user-manager-employee-section" class="hidden">
+        <div class="flex gap-4 mb-6">
+          <button id="addEmployeeBtn" class="btn-primary px-6 py-3 rounded-md font-medium text-lg w-[180px]">Add Employee</button>
     </div>
 
-    <!-- User & Role Manager Section -->
+        <!-- Employee Table -->
+        <div id="employee-table-section">
+          <div class="w-full overflow-x-auto">
+            <table class="crm-table w-full mb-6 whitespace-nowrap">
+              <thead>
+                <tr>
+                  <th class="text-lg font-bold">Employee ID</th>
+                  <th class="text-lg font-bold">Name</th>
+                  <th class="text-lg font-bold">Email</th>
+                  <th class="text-lg font-bold">Phone</th>
+                  <th class="text-lg font-bold">Department</th>
+                  <th class="text-lg font-bold">Position</th>
+                  <th class="text-lg font-bold">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="employees-table-body">
+                <!-- Employees will be loaded here -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+        <!-- Employee Create Form -->
+        <div id="employee-create-form-section" class="hidden">
+          <h2 class="text-3xl font-semibold text-purple-700 mb-4 text-left">Create New Employee</h2>
+          
+          <div class="w-full max-w-xl mx-auto">
+            <form id="createEmployeeForm" class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-end bg-white p-8 rounded-lg shadow">
+              <div class="sm:col-span-2">
+                <label for="newEmployeeName" class="block text-sm font-medium text-purple-700">Name</label>
+                <input id="newEmployeeName" name="name" type="text" required class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              </div>
+              <div class="sm:col-span-2">
+                <label for="newEmployeeEmail" class="block text-sm font-medium text-purple-700">Email</label>
+                <input id="newEmployeeEmail" name="email" type="email" required class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              </div>
+              <div class="sm:col-span-2">
+                <label for="newEmployeePhone" class="block text-sm font-medium text-purple-700">Phone</label>
+                <input id="newEmployeePhone" name="phone" type="tel" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              </div>
+              <div class="sm:col-span-2">
+                <label for="newEmployeeDepartment" class="block text-sm font-medium text-purple-700">Department</label>
+                <input id="newEmployeeDepartment" name="department" type="text" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              </div>
+              <div class="sm:col-span-2">
+                <label for="newEmployeePosition" class="block text-sm font-medium text-purple-700">Position</label>
+                <input id="newEmployeePosition" name="position" type="text" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              </div>
+              <div class="sm:col-span-2 flex gap-2">
+                <button type="button" onclick="hideEmployeeForm()" class="btn-secondary py-2 px-6 rounded-md flex-1">Cancel</button>
+                <button type="submit" class="btn-primary py-2 px-6 rounded-md flex-1">Create Employee</button>
+              </div>
+            </form>
+          </div>
+        </div>
+        
+        <!-- Employee Edit Form -->
+        <div id="employee-edit-form-section" class="hidden">
+          <h2 class="text-3xl font-semibold text-purple-700 mb-4 text-left">Edit Employee</h2>
+          
+          <div class="w-full max-w-xl mx-auto">
+            <form id="editEmployeeForm" class="grid grid-cols-1 sm:grid-cols-2 gap-6 items-end bg-white p-8 rounded-lg shadow">
+              <input type="hidden" id="editEmployeeId" name="employeeId">
+              <div class="sm:col-span-2">
+                <label for="editEmployeeName" class="block text-sm font-medium text-purple-700">Name</label>
+                <input id="editEmployeeName" name="name" type="text" required class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              </div>
+              <div class="sm:col-span-2">
+                <label for="editEmployeeEmail" class="block text-sm font-medium text-purple-700">Email</label>
+                <input id="editEmployeeEmail" name="email" type="email" required class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              </div>
+              <div class="sm:col-span-2">
+                <label for="editEmployeePhone" class="block text-sm font-medium text-purple-700">Phone</label>
+                <input id="editEmployeePhone" name="phone" type="tel" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              </div>
+              <div class="sm:col-span-2">
+                <label for="editEmployeeDepartment" class="block text-sm font-medium text-purple-700">Department</label>
+                <input id="editEmployeeDepartment" name="department" type="text" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              </div>
+              <div class="sm:col-span-2">
+                <label for="editEmployeePosition" class="block text-sm font-medium text-purple-700">Position</label>
+                <input id="editEmployeePosition" name="position" type="text" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              </div>
+              <div class="sm:col-span-2 flex gap-2">
+                <button type="button" onclick="hideEmployeeEditForm()" class="btn-secondary py-2 px-6 rounded-md flex-1">Cancel</button>
+                <button type="submit" class="btn-primary py-2 px-6 rounded-md flex-1">Update Employee</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Channel Manager Section -->
     <div id="channel-manager" class="section hidden">
@@ -1020,6 +1150,10 @@
       
       <div class="flex gap-4 mb-6">
         <button id="addChannelBtn" class="btn-primary px-6 py-3 rounded-md font-medium text-lg w-[180px]">Add New</button>
+        <button onclick="exportChannels()" class="btn-secondary px-6 py-3 rounded-md font-medium text-lg w-[180px] flex items-center">
+          <span class="mr-2">📥</span>
+          <span>Export to Excel</span>
+        </button>
       </div>
 
       <!-- Channel Table -->
@@ -1034,6 +1168,7 @@
                 <th class="text-lg font-bold">Add Tag</th>
                 <th class="text-lg font-bold">Mobile No</th>
                 <th class="text-lg font-bold">Company Name</th>
+                <th class="text-lg font-bold">Total Impressions</th>
                 <th class="text-lg font-bold">Total Conversions</th>
                 <th class="text-lg font-bold">Actions</th>
               </tr>
@@ -1104,6 +1239,10 @@
             <div>
               <label for="mobileNo" class="block text-sm font-medium text-purple-700">Mobile No</label>
               <input id="mobileNo" name="Mobile_no" type="text" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full" placeholder="Optional">
+            </div>
+            <div>
+              <label for="totImpressions" class="block text-sm font-medium text-purple-700">Total Impressions</label>
+              <input id="totImpressions" name="Tot_impressions" type="number" min="0" value="0" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
             </div>
             <div>
               <label for="totConversions" class="block text-sm font-medium text-purple-700">Total Conversions</label>
@@ -3435,32 +3574,33 @@
       }
     }
 
-    // Function to load users for job assignment dropdown
+    // Function to load employees for job assignment dropdown
     async function loadUsersForJobAssignment() {
       try {
-        const response = await fetch('/api/users');
+        const response = await fetch('/api/employees');
         if (response.ok) {
-          const users = await response.json();
+          const employees = await response.json();
           const jobAssignedToSelect = document.getElementById('jobAssignedTo');
           if (jobAssignedToSelect) {
             // Clear existing options except the first one
             jobAssignedToSelect.innerHTML = '<option value="">Select Employee</option>';
             
-            // Add ONLY active users (excluding Superuser) - NO deleted users in new campaign form
-            users.forEach(user => {
-              if (user.username !== 'Superuser') {
+            // Add all employees sorted by name
+            employees.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            employees.forEach(employee => {
+              if (employee.name) {
                 const option = document.createElement('option');
-                option.value = user.username;
-                option.textContent = user.username;
+                option.value = employee.name;
+                option.textContent = employee.name;
                 jobAssignedToSelect.appendChild(option);
               }
             });
           }
         } else {
-          console.error('Failed to load users:', response.statusText);
+          console.error('Failed to load employees:', response.statusText);
         }
       } catch (error) {
-        console.error('Error loading users:', error);
+        console.error('Error loading employees:', error);
       }
     }
 
@@ -3515,81 +3655,83 @@
     // Make loadUsersForJobAssignment globally available for testing
     window.loadUsersForJobAssignment = loadUsersForJobAssignment;
 
-    // Function to load users for job assignment dropdown in a specific form
-    async function loadUsersForJobAssignmentInForm(formContainer, currentAssignedUser = null) {
+    // Function to load employees for job assignment dropdown in a specific form
+    async function loadUsersForJobAssignmentInForm(formContainer, currentAssignedEmployee = null) {
       try {
-        const response = await fetch('/api/users');
+        const response = await fetch('/api/employees');
         if (response.ok) {
-          const users = await response.json();
+          const employees = await response.json();
           const jobAssignedToSelect = formContainer.querySelector('#jobAssignedTo');
           if (jobAssignedToSelect) {
             // Clear existing options except the first one
             jobAssignedToSelect.innerHTML = '<option value="">Select Employee</option>';
             
-            // Add ONLY active users (excluding Superuser) - NO deleted users in edit form
-            users.forEach(user => {
-              if (user.username !== 'Superuser') {
+            // Add all employees sorted by name
+            employees.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            employees.forEach(employee => {
+              if (employee.name) {
                 const option = document.createElement('option');
-                option.value = user.username;
-                option.textContent = user.username;
+                option.value = employee.name;
+                option.textContent = employee.name;
                 jobAssignedToSelect.appendChild(option);
               }
             });
             
-            // Special case: If the campaign being edited has a deleted user assigned,
-            // add that specific user to the dropdown so the current assignment is preserved
-            if (currentAssignedUser) {
-              const isActiveUser = users.find(user => user.username === currentAssignedUser);
-              if (!isActiveUser && currentAssignedUser !== 'Superuser') {
+            // Special case: If the campaign being edited has an employee assigned that no longer exists,
+            // add that specific employee to the dropdown so the current assignment is preserved
+            if (currentAssignedEmployee) {
+              const isActiveEmployee = employees.find(emp => emp.name === currentAssignedEmployee);
+              if (!isActiveEmployee && currentAssignedEmployee) {
                 const option = document.createElement('option');
-                option.value = currentAssignedUser;
-                option.textContent = currentAssignedUser + ' (Inactive)';
+                option.value = currentAssignedEmployee;
+                option.textContent = currentAssignedEmployee + ' (Inactive)';
                 option.style.color = '#6B7280';
                 jobAssignedToSelect.appendChild(option);
               }
             }
           }
         } else {
-          console.error('Failed to load users for edit form:', response.statusText);
+          console.error('Failed to load employees for edit form:', response.statusText);
         }
       } catch (error) {
-        console.error('Error loading users for edit form:', error);
+        console.error('Error loading employees for edit form:', error);
       }
     }
 
-    // Function to load users for job assignment filter dropdown
+    // Function to load employees for job assignment filter dropdown
     async function loadUsersForJobAssignmentFilter() {
       try {
-        const response = await fetch('/api/users');
+        const response = await fetch('/api/employees');
         if (response.ok) {
-          const users = await response.json();
+          const employees = await response.json();
           const filterSelect = document.getElementById('filter-job-assigned-to');
           if (filterSelect) {
             // Clear existing options except the first one
             filterSelect.innerHTML = '<option value="">All Job Assigned To</option>';
             
-            // Get existing job assignments to include deleted users
+            // Get existing job assignments to include deleted employees
             const existingAssignments = await getExistingJobAssignments();
             
-            // Add active users (excluding Superuser)
-            users.forEach(user => {
-              if (user.username !== 'Superuser') {
+            // Add all employees sorted by name
+            employees.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+            employees.forEach(employee => {
+              if (employee.name) {
                 const option = document.createElement('option');
-                option.value = user.username;
-                option.textContent = user.username;
+                option.value = employee.name;
+                option.textContent = employee.name;
                 filterSelect.appendChild(option);
               }
             });
             
-            // Add previously assigned users who might have been deleted
-            existingAssignments.forEach(username => {
-              if (username) {
-                const isActiveUser = users.find(user => user.username === username);
-                if (!isActiveUser) {
-                  // User was deleted but has existing assignments - show as inactive
+            // Add previously assigned employees who might have been deleted
+            existingAssignments.forEach(employeeName => {
+              if (employeeName) {
+                const isActiveEmployee = employees.find(emp => emp.name === employeeName);
+                if (!isActiveEmployee) {
+                  // Employee was deleted but has existing assignments - show as inactive
                   const option = document.createElement('option');
-                  option.value = username;
-                  option.textContent = username + ' (Inactive)';
+                  option.value = employeeName;
+                  option.textContent = employeeName + ' (Inactive)';
                   option.style.color = '#6B7280';
                   filterSelect.appendChild(option);
                 }
@@ -3597,10 +3739,10 @@
             });
           }
         } else {
-          console.error('Failed to load users for filter:', response.statusText);
+          console.error('Failed to load employees for filter:', response.statusText);
         }
       } catch (error) {
-        console.error('Error loading users for filter:', error);
+        console.error('Error loading employees for filter:', error);
       }
     }
 
@@ -4151,6 +4293,13 @@
        console.log('exportCampaigns function finished.');
     }
 
+    // Export channels to Excel
+    function exportChannels() {
+      console.log('exportChannels function called');
+      window.location.href = '/api/channels/export';
+      console.log('exportChannels function finished.');
+    }
+
     // Campaign ID will be assigned by the backend persistent counter
     // No need to pre-generate IDs on the frontend
 
@@ -4340,10 +4489,10 @@
               <option value="Storefront">Storefront</option>
               <option value="Outdoor Ads">Outdoor Ads</option>
               <option value="Others">Others</option>
-          </select>
-        </div>
-        <div class="col-span-1">
-          <label class="block text-sm font-medium text-purple-700">Channel Tag</label>
+            </select>
+          </div>
+          <div class="col-span-1">
+            <label class="block text-sm font-medium text-purple-700">Channel Tag</label>
           <input 
             type="text" 
             class="channelTag p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full" 
@@ -4351,13 +4500,13 @@
             placeholder="Optional - Select or type"
             autocomplete="off"
           >
-        </div>
-        <div class="channelFields grid grid-cols-4 gap-2 col-span-4"></div>
-                    <div class="col-span-1 flex items-center justify-start">
-              <button type="button" onclick="removeChannelEntry(this)" class="btn-secondary py-1 px-2 text-xs rounded-md">
-                Remove
-              </button>
-            </div>
+          </div>
+          <div class="channelFields grid grid-cols-4 gap-2 col-span-4"></div>
+          <div class="col-span-1 flex items-center justify-start">
+            <button type="button" onclick="removeChannelEntry(this)" class="btn-secondary py-1 px-2 text-xs rounded-md">
+              Remove
+            </button>
+          </div>
         `;
          // Re-attach updateChannelFields listener to the new select
          const newSelect = entry.querySelector('.channelType');
@@ -5224,9 +5373,8 @@
         console.log('Raw stats response keys:', Object.keys(stats)); // Debug log
         console.log('Total impressions:', stats.totalImpressions); // Debug log
         console.log('Campaigns with impressions:', stats.campaignsWithImpressions); // Debug log
-        console.log('Impressions by channel:', stats.impressionsByChannel); // Debug log
+        console.log('Channels by type:', stats.channelsByType); // Debug log
         console.log('Impressions by platform:', stats.impressionsByPlatform); // Debug log
-        console.log('Top performing channels:', stats.topPerformingChannels); // Debug log
         
         if (response.ok) {
           displayImpressionStats(stats);
@@ -5245,89 +5393,65 @@
       // Display overall statistics
       const statsContainer = document.getElementById('impressionStats');
       statsContainer.innerHTML = `
+        <div class="mb-6">
+          <h3 class="text-lg font-semibold text-indigo-600 mb-4">📈 Marketing Summary</h3>
+          <div class="grid grid-cols-4 gap-4">
         <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-          <h4 class="text-sm font-medium text-blue-700 mb-2">Total Impressions</h4>
-          <p class="text-2xl font-bold text-blue-900">${new Intl.NumberFormat().format(stats.totalImpressions)}</p>
+              <h4 class="text-sm font-medium text-blue-700 mb-2">Total Number of Marketing Initiatives</h4>
+              <p class="text-2xl font-bold text-blue-900">${new Intl.NumberFormat().format(stats.totalMarketingInitiatives || 0)}</p>
         </div>
         <div class="bg-green-50 p-4 rounded-lg border border-green-200">
-                      <h4 class="text-sm font-medium text-green-700 mb-2">Marketing Records with Impressions</h4>
-          <p class="text-2xl font-bold text-green-900">${stats.campaignsWithImpressions}</p>
-        </div>
-        <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
-          <h4 class="text-sm font-medium text-purple-700 mb-2">Channel Types</h4>
-          <p class="text-2xl font-bold text-purple-900">${Object.keys(stats.impressionsByChannel).length}</p>
-        </div>
-        <div class="bg-orange-50 p-4 rounded-lg border border-orange-200">
-          <h4 class="text-sm font-medium text-orange-700 mb-2">Social Media Platforms</h4>
-          <p class="text-2xl font-bold text-orange-900">${Object.keys(stats.impressionsByPlatform).length}</p>
+              <h4 class="text-sm font-medium text-green-700 mb-2">Total Impressions</h4>
+              <p class="text-2xl font-bold text-green-900">${new Intl.NumberFormat().format(stats.totalImpressions || 0)}</p>
         </div>
         <div class="bg-red-50 p-4 rounded-lg border border-red-200">
           <h4 class="text-sm font-medium text-red-700 mb-2">Total Conversions</h4>
           <p class="text-2xl font-bold text-red-900">${new Intl.NumberFormat().format(stats.totalConversions || 0)}</p>
         </div>
-      `;
-
-      // Display top performing channels
-      const topChannelsContainer = document.getElementById('topChannels');
-      if (stats.topPerformingChannels.length > 0) {
-        topChannelsContainer.innerHTML = `
+            <div class="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <h4 class="text-sm font-medium text-purple-700 mb-2">Marketing Records with Impressions</h4>
+              <p class="text-2xl font-bold text-purple-900">${stats.campaignsWithImpressions}</p>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 gap-4">
+          <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-200">
+            <h4 class="text-lg font-semibold text-indigo-700 mb-3">Channel Types Summary</h4>
+            ${Object.keys(stats.channelsByType || {}).length > 0 ? `
           <div class="overflow-x-auto">
-            <table class="min-w-full divide-y divide-gray-200">
-              <thead class="bg-gray-50">
-                <tr>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Campaign</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Channel Type</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Platform</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Impressions</th>
-                  <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Conversions</th>
+                <table class="min-w-full divide-y divide-indigo-200">
+                  <thead class="bg-indigo-100">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-indigo-700 uppercase tracking-wider">Channel Type</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-indigo-700 uppercase tracking-wider">Total Impressions</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-indigo-700 uppercase tracking-wider">Total Conversions</th>
                 </tr>
               </thead>
-              <tbody class="bg-white divide-y divide-gray-200">
-                ${stats.topPerformingChannels.map(channel => `
-                  <tr>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${channel.campaignName}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${channel.channelType}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${channel.platform}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${channel.adName}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${new Intl.NumberFormat().format(channel.impressions)}</td>
-                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${new Intl.NumberFormat().format(channel.conversions || 0)}</td>
+                  <tbody class="bg-white divide-y divide-indigo-200">
+                    ${Object.entries(stats.channelsByType || {})
+                      .sort((a, b) => {
+                        // Primary sort: impressions (descending)
+                        if (b[1].impressions !== a[1].impressions) {
+                          return b[1].impressions - a[1].impressions;
+                        }
+                        // Secondary sort: conversions (descending)
+                        return b[1].conversions - a[1].conversions;
+                      })
+                      .map(([channelType, data]) => `
+                      <tr>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${channelType}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-indigo-600">${new Intl.NumberFormat().format(data.impressions || 0)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-indigo-600">${new Intl.NumberFormat().format(data.conversions || 0)}</td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
           </div>
-        `;
-      } else {
-        topChannelsContainer.innerHTML = '<p class="text-gray-500">No impression data available yet.</p>';
-      }
-
-      // Display channel breakdown
-      const campaignListContainer = document.getElementById('campaignImpressionsList');
-      if (Object.keys(stats.impressionsByChannel).length > 0) {
-        campaignListContainer.innerHTML = `
-          <div class="space-y-4">
-            <h4 class="text-sm font-medium text-gray-700 mb-3">Impressions by Channel Type</h4>
-            ${Object.entries(stats.impressionsByChannel).map(([channelType, impressions]) => `
-              <div class="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                <span class="font-medium text-gray-700">${channelType}</span>
-                <span class="text-lg font-bold text-purple-600">${new Intl.NumberFormat().format(impressions)}</span>
+            ` : '<p class="text-gray-500 text-sm">No channel data available.</p>'}
               </div>
-            `).join('')}
-            ${Object.keys(stats.impressionsByPlatform).length > 0 ? `
-              <h4 class="text-sm font-medium text-gray-700 mb-3 mt-6">Impressions by Social Media Platform</h4>
-              ${Object.entries(stats.impressionsByPlatform).map(([platform, impressions]) => `
-                <div class="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-                  <span class="font-medium text-blue-700">${platform}</span>
-                  <span class="text-lg font-bold text-blue-600">${new Intl.NumberFormat().format(impressions)}</span>
-                </div>
-              `).join('')}
-            ` : ''}
           </div>
         `;
-      } else {
-        campaignListContainer.innerHTML = '<p class="text-gray-500">No impression data available yet.</p>';
-      }
+
     }
 
     async function searchByTag() {
@@ -5386,7 +5510,7 @@
 
       let html = `
         <div class="bg-green-50 p-3 rounded-lg mb-4">
-          <h4 class="text-sm font-medium text-green-700">Found ${result.count} campaign(s) with reference code: ${result.tagNumber}</h4>
+          <h4 class="text-sm font-medium text-green-700">Found ${result.count || result.campaigns?.length || 0} Marketing Initiative(s) with reference code: ${result.tagNumber}</h4>
         </div>
       `;
 
@@ -5478,7 +5602,7 @@
     }
 
     function displayTagCounters(result) {
-      const container = document.getElementById('tagCounters');
+      const container = document.getElementById('tagCountersContent');
       
       if (result.counters.length === 0) {
         container.innerHTML = '<p class="text-gray-500">No tag counters found.</p>';
@@ -5533,6 +5657,20 @@
     function displayCampaignChannels(campaign) {
       const displayDiv = document.getElementById('campaignChannelsDisplay');
       const channelsList = document.getElementById('channelsList');
+      const marketingAchievedDiv = document.getElementById('marketingAchievedDisplay');
+      
+      // Display marketing achieved impressions and conversions
+      if (marketingAchievedDiv) {
+        const currentImpressions = campaign.achieved?.impressions || 0;
+        const currentConversions = campaign.achieved?.conversions || 0;
+        
+        document.getElementById('currentMarketingImpressions').textContent = new Intl.NumberFormat().format(currentImpressions);
+        document.getElementById('currentMarketingConversions').textContent = new Intl.NumberFormat().format(currentConversions);
+        document.getElementById('marketingImpressions').value = currentImpressions;
+        document.getElementById('marketingConversions').value = currentConversions;
+        
+        marketingAchievedDiv.classList.remove('hidden');
+      }
       
       if (!campaign.channels || campaign.channels.length === 0) {
         channelsList.innerHTML = '<p class="text-gray-500">No channels found for this campaign.</p>';
@@ -5592,6 +5730,50 @@
       displayDiv.classList.remove('hidden');
     }
 
+    async function updateMarketingAchieved() {
+      const campaignId = document.getElementById('updateCampaignId').value.trim();
+      const impressions = parseInt(document.getElementById('marketingImpressions').value);
+      const conversions = parseInt(document.getElementById('marketingConversions').value);
+
+      if (!campaignId) {
+        alert('Please enter a Marketing ID first.');
+        return;
+      }
+
+      if (isNaN(impressions) || impressions < 0) {
+        alert('Please enter a valid impressions value (must be a positive number).');
+        return;
+      }
+
+      if (isNaN(conversions) || conversions < 0) {
+        alert('Please enter a valid conversions value (must be a positive number).');
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/campaigns/${campaignId}/achieved`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ impressions, conversions })
+        });
+
+        const result = await response.json();
+        
+        if (response.ok) {
+          alert('Marketing achieved impressions and conversions updated successfully!');
+          // Refresh the campaign display
+          loadCampaignChannels();
+          // Refresh the statistics
+          loadImpressionStats();
+        } else {
+          alert('Error: ' + result.error);
+        }
+      } catch (err) {
+        console.error('Error updating marketing achieved:', err);
+        alert('Error updating marketing achieved: ' + err.message);
+      }
+    }
+
     async function updateChannelMetrics(tagNumber, channelIndex) {
       const impressionsInput = document.getElementById(`impressions_${tagNumber}`);
       const conversionsInput = document.getElementById(`conversions_${tagNumber}`);
@@ -5642,6 +5824,33 @@
       } catch (err) {
         console.error('Error updating impressions:', err);
         alert('Error updating impressions: ' + err.message);
+      }
+    }
+
+    // Toggle impression tracking sections
+    function toggleImpressionSection(sectionId) {
+      // Hide all sections first
+      const sections = ['overallStats', 'updateImpressions', 'searchByTag', 'tagCounters', 'priorityChannels'];
+      sections.forEach(id => {
+        const section = document.getElementById(id);
+        if (section) {
+          section.classList.add('hidden');
+        }
+      });
+      
+      // Show the selected section
+      const selectedSection = document.getElementById(sectionId);
+      if (selectedSection) {
+        selectedSection.classList.remove('hidden');
+        
+        // Auto-load data when section is shown
+        if (sectionId === 'overallStats') {
+          loadImpressionStats();
+        } else if (sectionId === 'tagCounters') {
+          loadTagCounters();
+        } else if (sectionId === 'priorityChannels') {
+          showPriorityChannels();
+        }
       }
     }
 
@@ -5868,6 +6077,12 @@
       const goalImpressionsMax = document.getElementById('filter-goal-impressions-max')?.value || '';
       const goalConversionsMin = document.getElementById('filter-goal-conversions-min')?.value || '';
       const goalConversionsMax = document.getElementById('filter-goal-conversions-max')?.value || '';
+      const achievedSalesMin = document.getElementById('filter-achieved-sales-min')?.value || '';
+      const achievedSalesMax = document.getElementById('filter-achieved-sales-max')?.value || '';
+      const achievedImpressionsMin = document.getElementById('filter-achieved-impressions-min')?.value || '';
+      const achievedImpressionsMax = document.getElementById('filter-achieved-impressions-max')?.value || '';
+      const achievedConversionsMin = document.getElementById('filter-achieved-conversions-min')?.value || '';
+      const achievedConversionsMax = document.getElementById('filter-achieved-conversions-max')?.value || '';
       const channelsFilter = document.getElementById('filter-channels')?.value || '';
       const channelTagsFilter = document.getElementById('filter-channel-tags')?.value.toLowerCase() || '';
       const tagNumbersFilter = document.getElementById('filter-tag-numbers')?.value.toLowerCase() || '';
@@ -5922,6 +6137,18 @@
         // Goal Conversions filter
         if (goalConversionsMin && (!campaign.goals?.conversions || campaign.goals.conversions < parseFloat(goalConversionsMin))) return false;
         if (goalConversionsMax && (!campaign.goals?.conversions || campaign.goals.conversions > parseFloat(goalConversionsMax))) return false;
+        
+        // Achieved Sales filter
+        if (achievedSalesMin && (!campaign.achieved?.sales || campaign.achieved.sales < parseFloat(achievedSalesMin))) return false;
+        if (achievedSalesMax && (!campaign.achieved?.sales || campaign.achieved.sales > parseFloat(achievedSalesMax))) return false;
+        
+        // Achieved Impressions filter
+        if (achievedImpressionsMin && (!campaign.achieved?.impressions || campaign.achieved.impressions < parseFloat(achievedImpressionsMin))) return false;
+        if (achievedImpressionsMax && (!campaign.achieved?.impressions || campaign.achieved.impressions > parseFloat(achievedImpressionsMax))) return false;
+        
+        // Achieved Conversions filter
+        if (achievedConversionsMin && (!campaign.achieved?.conversions || campaign.achieved.conversions < parseFloat(achievedConversionsMin))) return false;
+        if (achievedConversionsMax && (!campaign.achieved?.conversions || campaign.achieved.conversions > parseFloat(achievedConversionsMax))) return false;
         
         // Channels filter
         if (channelsFilter) {
@@ -6069,7 +6296,7 @@
         queryCampaign();
       }
     }
-    
+
     // Auto-load campaigns table when page loads
     document.addEventListener('DOMContentLoaded', function() {
       // Show campaigns table by default
@@ -6457,7 +6684,7 @@
         tableBody.innerHTML = '';
 
         if (!channels || channels.length === 0) {
-          tableBody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-500 py-4">No channels found</td></tr>';
+          tableBody.innerHTML = '<tr><td colspan="9" class="text-center text-gray-500 py-4">No channels found</td></tr>';
           return;
         }
 
@@ -6470,6 +6697,7 @@
             <td>${channel.add_tag || '-'}</td>
             <td>${channel.Mobile_no || '-'}</td>
             <td>${channel.Company_name || '-'}</td>
+            <td>${channel.Tot_impressions || 0}</td>
             <td>${channel.Tot_conversions || 0}</td>
             <td>
               <button onclick="editChannel('${channel.channel_id}')" class="btn-primary py-1 px-3 rounded-md text-sm mr-2">Edit</button>
@@ -6497,6 +6725,7 @@
           document.getElementById('addTag').value = channel.add_tag || '';
           document.getElementById('mobileNo').value = channel.Mobile_no || '';
           document.getElementById('companyName').value = channel.Company_name || '';
+          document.getElementById('totImpressions').value = channel.Tot_impressions || 0;
           document.getElementById('totConversions').value = channel.Tot_conversions || 0;
         } else {
           // Create mode
@@ -6553,6 +6782,117 @@
           alert('Failed to delete channel. Please try again.');
         }
       };
+
+      // Show Priority Channels
+      window.showPriorityChannels = async function() {
+        const content = document.getElementById('priority-channels-content');
+        
+        if (!content) return;
+        
+        content.innerHTML = '<p class="text-gray-600">Loading priority channels data...</p>';
+        
+        try {
+          // Fetch channels from channels table
+          const channelsResponse = await fetch('/api/channels');
+          if (!channelsResponse.ok) throw new Error('Failed to fetch channels');
+          const channels = await channelsResponse.json();
+          
+          // Fetch all campaigns (marketing records)
+          const campaignsResponse = await fetch('/api/campaigns');
+          if (!campaignsResponse.ok) throw new Error('Failed to fetch campaigns');
+          const campaigns = await campaignsResponse.json();
+          
+          // Group channels by channel_type and channel_tag
+          const priorityGroups = {};
+          
+          channels.forEach(channel => {
+            const key = `${channel.channel_type}${channel.channel_tag ? '::' + channel.channel_tag : ''}`;
+            
+            if (!priorityGroups[key]) {
+              priorityGroups[key] = {
+                channel_type: channel.channel_type,
+                channel_tag: channel.channel_tag || '',
+                channel_id: channel.channel_id,
+                total_impressions: 0,
+                total_conversions: 0,
+                marketing_count: 0,
+                marketing_ids: []
+              };
+            }
+            
+            // Find matching channels in campaigns
+            campaigns.forEach(campaign => {
+              if (campaign.channels && Array.isArray(campaign.channels)) {
+                campaign.channels.forEach(campaignChannel => {
+                  // Match by channel type and channel tag
+                  const typeMatch = campaignChannel.type === channel.channel_type;
+                  const tagMatch = !channel.channel_tag || campaignChannel.channelTag === channel.channel_tag;
+                  
+                  if (typeMatch && tagMatch) {
+                    priorityGroups[key].total_impressions += campaignChannel.impressions || 0;
+                    priorityGroups[key].total_conversions += campaignChannel.conversions || 0;
+                    
+                    // Track unique marketing records
+                    if (!priorityGroups[key].marketing_ids.includes(campaign.campaignId)) {
+                      priorityGroups[key].marketing_ids.push(campaign.campaignId);
+                      priorityGroups[key].marketing_count++;
+                    }
+                  }
+                });
+              }
+            });
+          });
+          
+          // Convert to array and sort by total impressions (descending)
+          const priorityArray = Object.values(priorityGroups).sort((a, b) => {
+            if (b.total_impressions !== a.total_impressions) {
+              return b.total_impressions - a.total_impressions;
+            }
+            return b.total_conversions - a.total_conversions;
+          });
+          
+          // Display results
+          if (priorityArray.length === 0) {
+            content.innerHTML = '<p class="text-gray-600">No priority channels found. No matching channels in marketing records.</p>';
+            return;
+          }
+          
+          content.innerHTML = `
+            <div class="overflow-x-auto">
+              <table class="crm-table w-full">
+                <thead>
+                  <tr>
+                    <th class="text-lg font-bold">Channel ID</th>
+                    <th class="text-lg font-bold">Channel Type</th>
+                    <th class="text-lg font-bold">Channel Tag</th>
+                    <th class="text-lg font-bold">Total Impressions</th>
+                    <th class="text-lg font-bold">Total Conversions</th>
+                    <th class="text-lg font-bold">Marketing Records</th>
+                    <th class="text-lg font-bold">Marketing IDs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${priorityArray.map(group => `
+                    <tr>
+                      <td>${group.channel_id || 'N/A'}</td>
+                      <td>${group.channel_type || 'N/A'}</td>
+                      <td>${group.channel_tag || '-'}</td>
+                      <td class="text-right">${new Intl.NumberFormat().format(group.total_impressions)}</td>
+                      <td class="text-right">${new Intl.NumberFormat().format(group.total_conversions)}</td>
+                      <td class="text-right">${group.marketing_count}</td>
+                      <td>${group.marketing_ids.join(', ') || '-'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          `;
+        } catch (error) {
+          console.error('Error loading priority channels:', error);
+          content.innerHTML = `<p class="text-red-600">Error loading priority channels: ${error.message}</p>`;
+        }
+      };
+
 
       // Setup channel form event listeners
       const addChannelBtn = document.getElementById('addChannelBtn');
@@ -6630,6 +6970,262 @@
         populateChannelTagList();
       });
 });
+
+    // Employee Management Functions
+    function showEmployeeSection() {
+      const userSection = document.getElementById('user-manager-user-section');
+      const roleSection = document.getElementById('user-manager-role-section');
+      const employeeSection = document.getElementById('user-manager-employee-section');
+      
+      if (userSection) userSection.classList.add('hidden');
+      if (roleSection) roleSection.classList.add('hidden');
+      if (employeeSection) employeeSection.classList.remove('hidden');
+      
+      const toggleUserBtn = document.getElementById('toggleUserBtn');
+      const toggleRoleBtn = document.getElementById('toggleRoleBtn');
+      const toggleEmployeeBtn = document.getElementById('toggleEmployeeBtn');
+      
+      if (toggleUserBtn) {
+        toggleUserBtn.classList.remove('btn-primary');
+        toggleUserBtn.classList.add('btn-secondary');
+      }
+      if (toggleRoleBtn) {
+        toggleRoleBtn.classList.remove('btn-primary');
+        toggleRoleBtn.classList.add('btn-secondary');
+      }
+      if (toggleEmployeeBtn) {
+        toggleEmployeeBtn.classList.remove('btn-secondary');
+        toggleEmployeeBtn.classList.add('btn-primary');
+      }
+      
+      const employeeTableSection = document.getElementById('employee-table-section');
+      const employeeCreateFormSection = document.getElementById('employee-create-form-section');
+      const employeeEditFormSection = document.getElementById('employee-edit-form-section');
+      
+      if (employeeTableSection) employeeTableSection.classList.remove('hidden');
+      if (employeeCreateFormSection) employeeCreateFormSection.classList.add('hidden');
+      if (employeeEditFormSection) employeeEditFormSection.classList.add('hidden');
+      renderEmployeesTable();
+    }
+
+    function showEmployeeCreateForm() {
+      const employeeTableSection = document.getElementById('employee-table-section');
+      const employeeCreateFormSection = document.getElementById('employee-create-form-section');
+      const employeeEditFormSection = document.getElementById('employee-edit-form-section');
+      
+      if (employeeTableSection) employeeTableSection.classList.add('hidden');
+      if (employeeCreateFormSection) employeeCreateFormSection.classList.remove('hidden');
+      if (employeeEditFormSection) employeeEditFormSection.classList.add('hidden');
+      document.getElementById('createEmployeeForm').reset();
+    }
+
+    function hideEmployeeForm() {
+      const employeeTableSection = document.getElementById('employee-table-section');
+      const employeeCreateFormSection = document.getElementById('employee-create-form-section');
+      
+      if (employeeTableSection) employeeTableSection.classList.remove('hidden');
+      if (employeeCreateFormSection) employeeCreateFormSection.classList.add('hidden');
+    }
+
+    function showEmployeeEditForm(employeeId) {
+      const employeeTableSection = document.getElementById('employee-table-section');
+      const employeeCreateFormSection = document.getElementById('employee-create-form-section');
+      const employeeEditFormSection = document.getElementById('employee-edit-form-section');
+      
+      if (employeeTableSection) employeeTableSection.classList.add('hidden');
+      if (employeeCreateFormSection) employeeCreateFormSection.classList.add('hidden');
+      if (employeeEditFormSection) employeeEditFormSection.classList.remove('hidden');
+      loadEmployeeForEdit(employeeId);
+    }
+
+    function hideEmployeeEditForm() {
+      const employeeTableSection = document.getElementById('employee-table-section');
+      const employeeEditFormSection = document.getElementById('employee-edit-form-section');
+      
+      if (employeeTableSection) employeeTableSection.classList.remove('hidden');
+      if (employeeEditFormSection) employeeEditFormSection.classList.add('hidden');
+    }
+
+    async function renderEmployeesTable() {
+      try {
+        const response = await fetch('/api/employees');
+        const employees = await response.json();
+        const tbody = document.getElementById('employees-table-body');
+        
+        if (tbody) {
+          tbody.innerHTML = '';
+          if (Array.isArray(employees) && employees.length > 0) {
+            employees.forEach(employee => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = `
+                <td><b>${employee.employee_id || 'N/A'}</b></td>
+                <td>${employee.name || 'N/A'}</td>
+                <td>${employee.email || 'N/A'}</td>
+                <td>${employee.phone || 'N/A'}</td>
+                <td>${employee.department || 'N/A'}</td>
+                <td>${employee.position || 'N/A'}</td>
+                <td>
+                  <button style="background:#FFC107;color:#222;font-weight:bold;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;margin-right:6px;" onclick="showEmployeeEditForm('${employee._id}')">Edit</button>
+                  <button style="background:#EF4444;color:white;font-weight:bold;border:none;padding:6px 18px;border-radius:6px;cursor:pointer;" onclick="deleteEmployee('${employee._id}')">Delete</button>
+                </td>
+              `;
+              tbody.appendChild(tr);
+            });
+          } else {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-500 py-4">No employees found.</td></tr>';
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching employees:', error);
+        const tbody = document.getElementById('employees-table-body');
+        if (tbody) {
+          tbody.innerHTML = '<tr><td colspan="7" class="text-center text-red-500 py-4">Error loading employees</td></tr>';
+        }
+      }
+    }
+
+    async function loadEmployeeForEdit(employeeId) {
+      try {
+        const response = await fetch(`/api/employees/${employeeId}`);
+        const employee = await response.json();
+        
+        document.getElementById('editEmployeeId').value = employee._id;
+        document.getElementById('editEmployeeName').value = employee.name || '';
+        document.getElementById('editEmployeeEmail').value = employee.email || '';
+        document.getElementById('editEmployeePhone').value = employee.phone || '';
+        document.getElementById('editEmployeeDepartment').value = employee.department || '';
+        document.getElementById('editEmployeePosition').value = employee.position || '';
+      } catch (error) {
+        console.error('Error loading employee:', error);
+        alert('Error loading employee data');
+      }
+    }
+
+    async function deleteEmployee(employeeId) {
+      if (!confirm('Are you sure you want to delete this employee?')) {
+        return;
+      }
+      
+      try {
+        const response = await fetch(`/api/employees/${employeeId}`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          alert('Employee deleted successfully');
+          renderEmployeesTable();
+          // Refresh job assignment dropdowns
+          if (typeof window.refreshJobAssignmentDropdowns === 'function') {
+            window.refreshJobAssignmentDropdowns();
+          }
+        } else {
+          const error = await response.json();
+          alert('Error: ' + (error.error || 'Failed to delete employee'));
+        }
+      } catch (error) {
+        console.error('Error deleting employee:', error);
+        alert('Error deleting employee');
+      }
+    }
+
+    // Attach event listeners when DOM is ready
+    document.addEventListener('DOMContentLoaded', () => {
+      const toggleEmployeeBtn = document.getElementById('toggleEmployeeBtn');
+      const addEmployeeBtn = document.getElementById('addEmployeeBtn');
+      
+      if (toggleEmployeeBtn) {
+        toggleEmployeeBtn.addEventListener('click', showEmployeeSection);
+      }
+      
+      if (addEmployeeBtn) {
+        addEmployeeBtn.addEventListener('click', showEmployeeCreateForm);
+      }
+
+      // Employee form handlers
+      const createEmployeeForm = document.getElementById('createEmployeeForm');
+      if (createEmployeeForm) {
+        createEmployeeForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const formData = {
+            name: document.getElementById('newEmployeeName').value,
+            email: document.getElementById('newEmployeeEmail').value,
+            phone: document.getElementById('newEmployeePhone').value,
+            department: document.getElementById('newEmployeeDepartment').value,
+            position: document.getElementById('newEmployeePosition').value
+          };
+          
+          try {
+            const response = await fetch('/api/employees', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(formData)
+            });
+            
+            if (response.ok) {
+              alert('Employee created successfully');
+              hideEmployeeForm();
+              renderEmployeesTable();
+              // Refresh job assignment dropdowns
+              if (typeof window.refreshJobAssignmentDropdowns === 'function') {
+                window.refreshJobAssignmentDropdowns();
+              }
+            } else {
+              const error = await response.json();
+              alert('Error: ' + (error.error || 'Failed to create employee'));
+            }
+          } catch (error) {
+            console.error('Error creating employee:', error);
+            alert('Error creating employee');
+          }
+        });
+      }
+
+      const editEmployeeForm = document.getElementById('editEmployeeForm');
+      if (editEmployeeForm) {
+        editEmployeeForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const employeeId = document.getElementById('editEmployeeId').value;
+          const formData = {
+            name: document.getElementById('editEmployeeName').value,
+            email: document.getElementById('editEmployeeEmail').value,
+            phone: document.getElementById('editEmployeePhone').value,
+            department: document.getElementById('editEmployeeDepartment').value,
+            position: document.getElementById('editEmployeePosition').value
+          };
+          
+          try {
+            const response = await fetch(`/api/employees/${employeeId}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(formData)
+            });
+            
+            if (response.ok) {
+              alert('Employee updated successfully');
+              hideEmployeeEditForm();
+              renderEmployeesTable();
+              // Refresh job assignment dropdowns
+              if (typeof window.refreshJobAssignmentDropdowns === 'function') {
+                window.refreshJobAssignmentDropdowns();
+              }
+            } else {
+              const error = await response.json();
+              alert('Error: ' + (error.error || 'Failed to update employee'));
+            }
+          } catch (error) {
+            console.error('Error updating employee:', error);
+            alert('Error updating employee');
+          }
+        });
+      }
+    });
+
+    // Make functions globally accessible
+    window.showEmployeeEditForm = showEmployeeEditForm;
+    window.deleteEmployee = deleteEmployee;
+    window.hideEmployeeForm = hideEmployeeForm;
+    window.hideEmployeeEditForm = hideEmployeeEditForm;
+    window.renderEmployeesTable = renderEmployeesTable;
 </script>
 
 </body>

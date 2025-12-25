@@ -124,7 +124,6 @@ class SessionManager {
       export_data: false,
       manage_users: false,
       manage_roles: false,
-      generate_tags: false,
       manage_channels: false
     };
   }
@@ -168,10 +167,6 @@ class SessionManager {
 
   canManageRoles() {
     return this.hasPermission('manage_roles');
-  }
-
-  canGenerateTags() {
-    return this.hasPermission('generate_tags');
   }
 
   canManageChannels() {

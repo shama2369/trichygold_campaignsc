@@ -14,7 +14,6 @@ const viewerRole = {
     export_data: false,
     manage_users: false,
     manage_roles: false,
-    generate_tags: false,
     manage_channels: false
   },
   created_at: new Date(),
@@ -34,7 +33,6 @@ const editorRole = {
     export_data: true,
     manage_users: false,
     manage_roles: false,
-    generate_tags: true,
     manage_channels: true
   },
   created_at: new Date(),
@@ -54,7 +52,6 @@ const adminRole = {
     export_data: true,
     manage_users: true,
     manage_roles: true,
-    generate_tags: true,
     manage_channels: true
   },
   created_at: new Date(),
@@ -77,7 +74,6 @@ db.roles.insertOne({
     export_data: false,
     manage_users: false,
     manage_roles: false,
-    generate_tags: false,
     manage_channels: false
   },
   created_at: new Date(),
@@ -97,7 +93,6 @@ db.roles.insertOne({
     export_data: true,
     manage_users: false,
     manage_roles: false,
-    generate_tags: true,
     manage_channels: true
   },
   created_at: new Date(),

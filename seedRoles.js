@@ -44,7 +44,6 @@ async function seedRoles() {
         export_data: true,
         manage_users: true,
         manage_roles: true,
-        generate_tags: true,
         manage_channels: true
       },
       created_at: new Date(),
@@ -67,7 +66,6 @@ async function seedRoles() {
       'export_data',
       'manage_users',
       'manage_roles',
-      'generate_tags',
       'manage_channels'
     ];
     
@@ -77,7 +75,7 @@ async function seedRoles() {
     
     console.log('\n🎯 Next steps:');
     console.log('1. Create "viewer" role with view_campaigns: true, view_reports: true');
-    console.log('2. Create "editor" role with create_campaigns: true, edit_campaigns: true, view_reports: true, export_data: true, generate_tags: true, manage_channels: true');
+    console.log('2. Create "editor" role with create_campaigns: true, edit_campaigns: true, view_reports: true, export_data: true, manage_channels: true');
     console.log('3. Assign roles to users as needed');
     
     // Show MongoDB commands for manual creation
@@ -98,7 +96,6 @@ async function seedRoles() {
     export_data: false,
     manage_users: false,
     manage_roles: false,
-    generate_tags: false,
     manage_channels: false
   },
   created_at: new Date(),
@@ -118,7 +115,6 @@ async function seedRoles() {
     export_data: true,
     manage_users: false,
     manage_roles: false,
-    generate_tags: true,
     manage_channels: true
   },
   created_at: new Date(),
