@@ -301,6 +301,7 @@
               <th style="width: 150px;">Channels</th>
               <th style="width: 150px;">Channel Tag</th>
               <th style="width: 150px;">Reference Codes</th>
+              <th style="width: 100px;">Image</th>
             </tr>
             <tr>
               <th><!-- No filter for checkbox --></th>
@@ -427,6 +428,7 @@
               <th>
                 <input type="text" id="filter-tag-numbers" placeholder="Filter Reference Codes" class="form-control form-control-sm">
               </th>
+              <th><!-- No filter for Image --></th>
             </tr>
           </thead>
           <tbody id="campaigns-table-body">
@@ -687,7 +689,7 @@
           <!-- Campaign details form will be loaded here -->
 </div>
 </div>
-<button id="downloadExcelBtn" class="btn-secondary mt-3 py-2 px-4 rounded-md hidden">Export Table</button>
+<button id="downloadExcelBtn" class="btn-secondary mt-3 py-2 px-4 rounded-md hidden" onclick="exportQueriedCampaign()">Export Table</button>
 <script>
         // Helper to show/hide query campaign input section
         function setQueryCampaignInputVisibility(visible) {
@@ -791,7 +793,6 @@
           <button onclick="toggleImpressionSection('updateImpressions')" class="btn-primary py-2 px-4 rounded-lg text-xs w-24" title="Edit impression and conversion for channels by Marketing ID">✏️ Update</button>
           <button onclick="toggleImpressionSection('searchByTag')" class="btn-primary py-2 px-4 rounded-lg text-xs w-24" title="Find channels and marketing initiatives by searching with Reference Code (tag number)">🔍 Search</button>
           <button onclick="toggleImpressionSection('tagCounters')" class="btn-primary py-2 px-4 rounded-lg text-xs w-24" title="View Reference Code counters showing the last used number">🔢 Counters</button>
-          <button onclick="toggleImpressionSection('priorityChannels')" class="btn-primary py-2 px-4 rounded-lg text-xs w-24" title="View priority channels with total impressions and conversions grouped from marketing records">⭐ Priority</button>
         </div>
       </div>
 
@@ -890,15 +891,6 @@
             <!-- Tag counters will be displayed here -->
           </div>
         </div>
-      </div>
-
-      <!-- Priority Channels -->
-      <div id="priorityChannels" class="mb-6 hidden">
-        <div class="bg-white p-4 rounded-lg border border-gray-200">
-          <div id="priority-channels-content">
-            <p class="text-gray-600">Loading priority channels data...</p>
-        </div>
-      </div>
       </div>
 
     </div>
@@ -1154,6 +1146,10 @@
           <span class="mr-2">📥</span>
           <span>Export to Excel</span>
         </button>
+        <button onclick="togglePriorityChannels()" class="btn-primary px-6 py-3 rounded-md font-medium text-lg w-[200px] flex items-center">
+          <span class="mr-2">⭐</span>
+          <span>Priority Channels</span>
+        </button>
       </div>
 
       <!-- Channel Table -->
@@ -1257,6 +1253,15 @@
               <button type="submit" class="btn-primary py-2 px-6 rounded-md">Save Channel</button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <!-- Priority Channels Section -->
+      <div id="priorityChannels" class="hidden mt-6">
+        <div class="bg-white p-4 rounded-lg border border-gray-200">
+          <div id="priority-channels-content">
+            <p class="text-gray-600">Loading priority channels data...</p>
+          </div>
         </div>
       </div>
     </div>
@@ -3064,8 +3069,24 @@
       }
       
       // Auto-generate tag for channel types that don't require platform selection
+      // BUT ONLY if no tag number already exists (to preserve existing tags during edit)
       if (type && type !== 'Storefront' && type !== 'Email' && type !== 'YouTube' && type !== 'WhatsApp Group' && type !== 'Gold councils' && type !== 'Outdoor Ads') {
         setTimeout(() => {
+          // Check if tag number already exists or is being populated - if so, don't generate a new one
+          const tagNumberInput = entry.querySelector('.channelTagNumber');
+          if (tagNumberInput) {
+            // Check if tag already has a value
+            if (tagNumberInput.value && tagNumberInput.value.trim() !== '') {
+              console.log('Tag number already exists, skipping auto-generation:', tagNumberInput.value);
+              return; // Don't generate if tag already exists
+            }
+            // Check if we're currently populating (during edit)
+            if (tagNumberInput.hasAttribute('data-populating')) {
+              console.log('Tag number is being populated, skipping auto-generation');
+              return; // Don't generate if we're populating
+            }
+          }
+          
           // Verify the channelType is still set before generating tag
           const channelTypeSelect = entry.querySelector('.channelType');
           if (channelTypeSelect && channelTypeSelect.value === type) {
@@ -3156,7 +3177,10 @@
         }
       } catch (error) {
         // Silently handle errors - users can still type custom tags
-        console.warn('Error loading channel tags:', error.message);
+        // Only log if it's not a network error (which is expected if server isn't running)
+        if (error.message !== 'Failed to fetch') {
+          console.warn('Error loading channel tags:', error.message);
+        }
       }
     };
 
@@ -3550,26 +3574,56 @@
         
         // Add all image files
         const imageInputs = document.querySelectorAll('.image-upload-input');
+        console.log('=== IMAGE UPLOAD DEBUG ===');
+        console.log('Total image inputs found:', imageInputs.length);
+        
+        let imageCount = 0;
         imageInputs.forEach((input, index) => {
-          if (input.files[0]) {
-            formData.append(`campaignImage${index}`, input.files[0]);
+          if (input.files && input.files[0]) {
+            const file = input.files[0];
+            console.log(`Image ${index}: ${file.name} (${file.size} bytes, ${file.type})`);
+            formData.append(`campaignImage${index}`, file);
+            imageCount++;
+          } else {
+            console.log(`Image input ${index}: No file selected`);
           }
         });
+        
+        console.log(`Total images to upload: ${imageCount}`);
+        console.log('=== SENDING REQUEST TO SERVER ===');
+        console.log('FormData entries:');
+        for (let pair of formData.entries()) {
+          if (pair[1] instanceof File) {
+            console.log(`  ${pair[0]}: File(${pair[1].name}, ${pair[1].size} bytes, ${pair[1].type})`);
+          } else {
+            console.log(`  ${pair[0]}: ${typeof pair[1] === 'string' ? pair[1].substring(0, 100) + '...' : pair[1]}`);
+          }
+        }
         
         const response = await fetch('/api/campaigns', {
           method: 'POST',
           body: formData, // Don't set Content-Type header, let browser set it for FormData
         });
+        
+        console.log('=== SERVER RESPONSE ===');
+        console.log('Status:', response.status);
+        console.log('Status Text:', response.statusText);
+        
         const result = await response.json();
+        console.log('Response data:', result);
+        
         if (response.ok) {
           // Display the campaignId assigned by the backend
           document.getElementById('campaignId').value = result.campaignId;
+          console.log('✓ Campaign created successfully with ID:', result.campaignId);
           alert(result.message);
           clearForm();
         } else {
+          console.error('✗ Server error:', result.error);
           alert('Error: ' + result.error);
         }
       } catch (err) {
+        console.error('✗ Request failed:', err);
         alert('Error: ' + err.message);
       }
     }
@@ -3895,7 +3949,7 @@
             ${result.targetAudience ? `
             <div class="border-t pt-4">
               <h3 class="text-md font-medium text-purple-600 mb-2">Target Audience</h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="grid grid-cols-2 gap-4">
                 <div>
                   <label class="block text-sm font-medium text-purple-700">Age</label>
                   <p class="text-base text-gray-900">${result.targetAudience.age || 'N/A'}</p>
@@ -3904,11 +3958,6 @@
                   <label class="block text-sm font-medium text-purple-700">Gender</label>
                   <p class="text-base text-gray-900">${result.targetAudience.gender || 'N/A'}</p>
                 </div>
-              </div>
-              <!-- Category Section - Full Width -->
-              <div class="mt-4">
-                <label class="block text-sm font-medium text-purple-700 mb-2">Category</label>
-                <p class="text-base text-gray-900">${result.targetAudience.categories && result.targetAudience.categories.length > 0 ? result.targetAudience.categories.map(obj => `${obj.category} (${obj.tag})`).join(', ') : 'N/A'}</p>
               </div>
             </div>` : ''}
             <!-- Goals -->
@@ -3955,76 +4004,184 @@
             ${result.channels && result.channels.length > 0 ? `
             <div class="border-t pt-4">
               <h3 class="text-md font-medium text-purple-600 mb-2">Channels</h3>
-              <div class="space-y-4">
-                ${result.channels.map((channel, index) => `
-                  <div class="channelEntry grid grid-cols-6 gap-2 items-end">
-                    <div class="col-span-1">
-                      <label class="block text-sm font-medium text-purple-700">Channel Type</label>
-                      <p class="text-base text-gray-900">${channel.type || 'N/A'}</p>
+              <div class="space-y-6">
+                ${result.channels.map((channel, index) => {
+                  // Determine label based on channel type
+                  const nameLabelTypes = ['Instagram', 'Facebook', 'TikTok', 'YouTube', 'Snapchat', 'Google', 'WhatsApp Group', 'Outdoor Ads', 'Promotional Items', 'Promotional Offer'];
+                  const labelText = nameLabelTypes.includes(channel.type) ? 'Name' : 'Description';
+                  
+                  // Build fields array for proper layout
+                  const fields = [];
+                  
+                  // Always show Name/Description first
+                  if (channel.adName) {
+                    fields.push({ label: labelText, value: channel.adName, span: 1 });
+                  }
+                  
+                  // Platform (for Social Media, Email, etc.)
+                  if (channel.platform) {
+                    fields.push({ label: 'Platform', value: channel.platform, span: 1 });
+                  }
+                  
+                  // Publication (for Print Media)
+                  if (channel.publication) {
+                    fields.push({ label: 'Publication', value: channel.publication, span: 1 });
+                  }
+                  
+                  // Station (for Radio)
+                  if (channel.station) {
+                    fields.push({ label: 'Station', value: channel.station, span: 1 });
+                  }
+                  
+                  // Cost
+                  if (channel.cost !== undefined && channel.cost !== null) {
+                    fields.push({ label: 'Cost', value: channel.cost ? new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(channel.cost) : 'N/A', span: 1 });
+                  }
+                  
+                  // Ad Type
+                  if (channel.adType) {
+                    fields.push({ label: 'Type', value: channel.adType, span: 1 });
+                  }
+                  
+                  // Types (multi-select types)
+                  if (channel.types && Array.isArray(channel.types) && channel.types.length > 0) {
+                    fields.push({ label: 'Types', value: channel.types.join(', '), span: 4 });
+                  }
+                  
+                  // Venue/Location
+                  if (channel.venue) {
+                    fields.push({ label: 'Venue', value: channel.venue, span: 1 });
+                  }
+                  
+                  // Area
+                  if (channel.area) {
+                    fields.push({ label: 'Area', value: channel.area, span: 1 });
+                  }
+                  
+                  // Quantity
+                  if (channel.qty !== undefined && channel.qty !== null) {
+                    fields.push({ label: 'Quantity', value: channel.qty, span: 1 });
+                  }
+                  
+                  // Start Date
+                  if (channel.startDate) {
+                    fields.push({ label: 'Start Date', value: formatDateDDMMYY(channel.startDate), span: 1 });
+                  }
+                  
+                  // End Date
+                  if (channel.endDate) {
+                    fields.push({ label: 'End Date', value: formatDateDDMMYY(channel.endDate), span: 1 });
+                  }
+                  
+                  // Impressions
+                  if (channel.impressions !== undefined && channel.impressions !== null) {
+                    fields.push({ label: 'Impressions', value: new Intl.NumberFormat().format(channel.impressions), span: 1 });
+                  }
+                  
+                  // Conversions
+                  if (channel.conversions !== undefined && channel.conversions !== null) {
+                    fields.push({ label: 'Conversions', value: new Intl.NumberFormat().format(channel.conversions), span: 1 });
+                  }
+                  
+                  // Reference Code
+                  if (channel.tagNumber) {
+                    fields.push({ label: 'Reference Code', value: channel.tagNumber, span: 1, isCode: true });
+                  }
+                  
+                  // Channel Tag
+                  if (channel.channelTag) {
+                    fields.push({ label: 'Channel Tag', value: channel.channelTag, span: 1 });
+                  }
+                  
+                  // Render fields in rows
+                  let fieldsHTML = '';
+                  let currentRow = [];
+                  let currentRowSpan = 0;
+                  
+                  fields.forEach((field, idx) => {
+                    if (field.span === 4 || currentRowSpan + field.span > 4) {
+                      // Start new row
+                      if (currentRow.length > 0) {
+                        fieldsHTML += `<div class="grid grid-cols-4 gap-2 mb-2">${currentRow.join('')}</div>`;
+                      }
+                      currentRow = [];
+                      currentRowSpan = 0;
+                    }
+                    
+                    const fieldHTML = `
+                      <div class="${field.span === 4 ? 'col-span-4' : ''}">
+                        <label class="block text-sm font-medium text-purple-700">${field.label}</label>
+                        <p class="text-base text-gray-900 ${field.isCode ? 'font-mono bg-yellow-100 px-2 py-1 rounded inline-block' : ''}">${field.value}</p>
                     </div>
-                    <div class="channelFields grid grid-cols-4 gap-2 col-span-4">
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">${['Instagram', 'Facebook', 'TikTok', 'YouTube', 'Snapchat', 'Google', 'WhatsApp Group'].includes(channel.type) ? 'Name' : 'Description'}</label>
-                        <p class="text-base text-gray-900">${channel.adName || 'N/A'}</p>
+                    `;
+                    currentRow.push(fieldHTML);
+                    currentRowSpan += field.span;
+                  });
+                  
+                  // Add remaining fields in current row
+                  if (currentRow.length > 0) {
+                    fieldsHTML += `<div class="grid grid-cols-4 gap-2 mb-2">${currentRow.join('')}</div>`;
+                  }
+                  
+                  return `
+                    <div class="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div class="mb-3">
+                        <label class="block text-sm font-medium text-purple-700 mb-1">Channel Type</label>
+                        <p class="text-base font-semibold text-gray-900">${channel.type || 'N/A'}</p>
                       </div>
-                      ${channel.platform ? `
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">Platform</label>
-                        <p class="text-base text-gray-900">${channel.platform}</p>
-                      </div>` : ''}
-                      ${channel.publication ? `
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">Publication</label>
-                        <p class="text-base text-gray-900">${channel.publication}</p>
-                      </div>` : ''}
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">Cost</label>
-                        <p class="text-base text-gray-900">${channel.cost ? new Intl.NumberFormat('en-AE', { style: 'currency', currency: 'AED' }).format(channel.cost) : 'N/A'}</p>
+                      ${fieldsHTML}
                       </div>
-                      ${channel.adType ? `
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">Type</label>
-                        <p class="text-base text-gray-900">${channel.adType}</p>
-                      </div>` : ''}
-                      ${channel.types && Array.isArray(channel.types) && channel.types.length > 0 ? `
-                      <div class="col-span-4">
-                        <label class="block text-sm font-medium text-purple-700">Types</label>
-                        <p class="text-base text-gray-900">${channel.types.join(', ')}</p>
-                      </div>` : ''}
-                      ${channel.qty ? `
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">Quantity</label>
-                        <p class="text-base text-gray-900">${channel.qty}</p>
-                      </div>` : ''}
-                      ${channel.impressions ? `
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">Impressions</label>
-                        <p class="text-base text-gray-900">${new Intl.NumberFormat().format(channel.impressions)}</p>
-                      </div>` : ''}
-                      ${channel.conversions ? `
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">Conversions</label>
-                        <p class="text-base text-gray-900">${new Intl.NumberFormat().format(channel.conversions)}</p>
-                      </div>` : ''}
-                      ${channel.tagNumber ? `
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">Reference Code</label>
-                        <p class="text-base text-gray-900 font-mono bg-yellow-100 px-2 py-1 rounded">${channel.tagNumber}</p>
-                      </div>` : ''}
-                      ${channel.startDate ? `
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">Start Date</label>
-                        <p class="text-base text-gray-900">${formatDateDDMMYY(channel.startDate)}</p>
-                      </div>` : ''}
-                      ${channel.endDate ? `
-                      <div>
-                        <label class="block text-sm font-medium text-purple-700">End Date</label>
-                        <p class="text-base text-gray-900">${formatDateDDMMYY(channel.endDate)}</p>
-                      </div>` : ''}
-                    </div>
-                  </div>
-                `).join('')}
+                  `;
+                }).join('')}
               </div>
+                      </div>` : ''}
+            
+            <!-- Campaign Images -->
+            ${result.images && Array.isArray(result.images) && result.images.length > 0 ? `
+            <div class="border-t pt-4">
+              <h3 class="text-md font-medium text-purple-600 mb-4">Campaign Images</h3>
+              <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                ${result.images.map((imagePath, index) => {
+                  if (!imagePath || imagePath.trim() === '') return '';
+                  const cleanPath = imagePath.trim();
+                  return `
+                    <div class="relative group">
+                      <img src="${cleanPath}" 
+                           alt="Campaign Image ${index + 1}" 
+                           class="w-full h-48 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                           onclick="window.open('${cleanPath}', '_blank')"
+                           onerror="console.error('Failed to load image:', '${cleanPath}'); this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect width=\'200\' height=\'200\' fill=\'%23f3f4f6\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%239ca3af\'%3EImage not found%3C/text%3E%3C/svg%3E';">
+                      <div class="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                        ${index + 1} / ${result.images.length}
+                    </div>
+                      <div class="absolute top-2 right-2 bg-blue-500 bg-opacity-75 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                           onclick="window.open('${cleanPath}', '_blank'); event.stopPropagation();"
+                           title="Click to view full size">
+                        View
+                  </div>
+              </div>
+                  `;
+                }).filter(html => html !== '').join('')}
+              </div>
+              <p class="text-xs text-gray-500 mt-2">Click on any image to view it in full size</p>
+            </div>` : result.images && typeof result.images === 'string' && result.images.trim() !== '' ? `
+            <div class="border-t pt-4">
+              <h3 class="text-md font-medium text-purple-600 mb-4">Campaign Images</h3>
+              <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                <div class="relative group">
+                  <img src="${result.images.trim()}" 
+                       alt="Campaign Image" 
+                       class="w-full h-48 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80 transition-opacity"
+                       onclick="window.open('${result.images.trim()}', '_blank')"
+                       onerror="console.error('Failed to load image:', '${result.images.trim()}'); this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect width=\'200\' height=\'200\' fill=\'%23f3f4f6\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%239ca3af\'%3EImage not found%3C/text%3E%3C/svg%3E';">
+                  <div class="absolute top-2 right-2 bg-blue-500 bg-opacity-75 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                       onclick="window.open('${result.images.trim()}', '_blank'); event.stopPropagation();"
+                       title="Click to view full size">
+                    View
+                  </div>
+                </div>
+              </div>
+              <p class="text-xs text-gray-500 mt-2">Click on the image to view it in full size</p>
             </div>` : ''}
           </div>`;
         queryCampaignForm.innerHTML = formHTML;
@@ -4135,7 +4292,7 @@
               ${result.targetAudience ? `
               <div class="bg-white p-4 rounded-lg border border-gray-200">
                 <h4 class="text-lg font-semibold text-purple-700 mb-3">Target Audience</h4>
-                <div class="grid grid-cols-3 gap-4">
+                <div class="grid grid-cols-2 gap-4">
                   <div>
                     <p class="text-sm font-medium text-gray-600">Age</p>
                     <p class="text-base text-gray-900">${result.targetAudience.age || 'N/A'}</p>
@@ -4143,8 +4300,6 @@
                   <div>
                     <p class="text-sm font-medium text-gray-600">Gender</p>
                     <p class="text-base text-gray-900">${result.targetAudience.gender || 'N/A'}</p>
-                  </div>
-                  <div>
                   </div>
                 </div>
               </div>` : ''}
@@ -4291,6 +4446,66 @@
       console.log('exportCampaigns function called');
       window.location.href = '/api/campaigns/export';
        console.log('exportCampaigns function finished.');
+    }
+
+    // Export the currently queried campaign to Excel
+    function exportQueriedCampaign() {
+      console.log('exportQueriedCampaign function called');
+      
+      // Get the campaign ID from the query form or selected radio
+      let campaignId = null;
+      
+      // First, try to get from query form (most reliable - it's what's displayed)
+      const queryForm = document.getElementById('queryCampaignForm');
+      if (queryForm && !queryForm.classList.contains('hidden')) {
+        // Look for the Marketing ID label and its value
+        const formLabels = queryForm.querySelectorAll('label');
+        formLabels.forEach(label => {
+          if (label.textContent.includes('Marketing ID')) {
+            const nextElement = label.nextElementSibling;
+            if (nextElement && nextElement.tagName === 'P') {
+              const idValue = nextElement.textContent.trim();
+              if (idValue && idValue !== 'N/A') {
+                campaignId = idValue;
+              }
+            }
+          }
+        });
+      }
+      
+      // If not found, try to get from selected radio button
+      if (!campaignId) {
+        const selectedRadio = document.querySelector('input[name="selected_campaign"]:checked');
+        if (selectedRadio) {
+          // Find the campaign in originalCampaigns to get the campaignId (human-readable ID)
+          const campaign = originalCampaigns.find(c => {
+            const cId = c._id ? (typeof c._id === 'string' ? c._id : c._id.toString()) : null;
+            return cId === selectedRadio.value || c._id === selectedRadio.value;
+          });
+          if (campaign && campaign.campaignId) {
+            campaignId = campaign.campaignId;
+          }
+        }
+      }
+      
+      // If still not found, try manual input
+      if (!campaignId) {
+        const manualInput = document.getElementById('queryCampaignCodeInput');
+        if (manualInput && manualInput.value) {
+          campaignId = manualInput.value.trim();
+        }
+      }
+      
+      if (campaignId && campaignId !== 'N/A') {
+        console.log('Exporting campaign:', campaignId);
+        window.location.href = `/api/campaigns/${campaignId}/export`;
+      } else {
+        console.warn('No campaign ID found, exporting all campaigns instead');
+        alert('No specific campaign found. Exporting all campaigns instead.');
+        window.location.href = '/api/campaigns/export';
+      }
+      
+      console.log('exportQueriedCampaign function finished.');
     }
 
     // Export channels to Excel
@@ -4730,11 +4945,88 @@
           formData.channels.push(channelData);
         });
 
-        // Send update request
+        // Collect images to remove (marked for removal)
+        const imagesToRemove = [];
+        const existingImageItems = editForm.querySelectorAll('.existing-image-item');
+        console.log('=== COLLECTING IMAGES TO REMOVE ===');
+        console.log('Total existing image items found:', existingImageItems.length);
+        
+        existingImageItems.forEach((item, index) => {
+          const markedForRemoval = item.dataset.markedForRemoval;
+          const imagePath = item.dataset.imagePath;
+          console.log(`Item ${index + 1}:`, {
+            imagePath: imagePath,
+            markedForRemoval: markedForRemoval,
+            willBeRemoved: markedForRemoval === 'true'
+          });
+          
+          if (markedForRemoval === 'true') {
+            if (imagePath) {
+              imagesToRemove.push(imagePath);
+              console.log(`  ✓ Added to removal list: ${imagePath}`);
+            } else {
+              console.log(`  ⚠ No imagePath found for item ${index + 1}`);
+            }
+          }
+        });
+        
+        console.log('=== IMAGES TO REMOVE SUMMARY ===');
+        console.log('Total images to remove:', imagesToRemove.length);
+        console.log('Images marked for removal:', imagesToRemove);
+        
+        // Add imagesToRemove to formData
+        formData.imagesToRemove = imagesToRemove;
+
+        // Create FormData for file upload (same as create)
+        const formDataWithFiles = new FormData();
+        formDataWithFiles.append('campaignData', JSON.stringify(formData));
+        
+        // Add all image files from the edit form
+        const imageInputs = editForm.querySelectorAll('.image-upload-input');
+        console.log('=== EDIT FORM IMAGE UPLOAD DEBUG ===');
+        console.log('Total image inputs found in edit form:', imageInputs.length);
+        
+        let imageCount = 0;
+        imageInputs.forEach((input, index) => {
+          if (input.files && input.files[0]) {
+            const file = input.files[0];
+            console.log(`Edit Image ${index}: ${file.name} (${file.size} bytes, ${file.type})`);
+            formDataWithFiles.append(`campaignImage${index}`, file);
+            imageCount++;
+          } else {
+            console.log(`Edit Image input ${index}: No file selected`);
+          }
+        });
+        
+        console.log(`Total images to upload in edit: ${imageCount}`);
+        console.log('=== SENDING EDIT REQUEST TO SERVER ===');
+        console.log('FormData entries:');
+        for (let pair of formDataWithFiles.entries()) {
+          if (pair[1] instanceof File) {
+            console.log(`  ${pair[0]}: File(${pair[1].name}, ${pair[1].size} bytes, ${pair[1].type})`);
+          } else {
+            const valueStr = typeof pair[1] === 'string' ? pair[1] : JSON.stringify(pair[1]);
+            if (pair[0] === 'campaignData') {
+              try {
+                const parsed = JSON.parse(valueStr);
+                console.log(`  ${pair[0]}:`, {
+                  hasImagesToRemove: !!parsed.imagesToRemove,
+                  imagesToRemove: parsed.imagesToRemove,
+                  imagesToRemoveLength: parsed.imagesToRemove?.length || 0
+                });
+              } catch (e) {
+                console.log(`  ${pair[0]}: ${valueStr.substring(0, 100)}...`);
+              }
+            } else {
+              console.log(`  ${pair[0]}: ${valueStr.substring(0, 100)}...`);
+            }
+          }
+        }
+
+        // Send update request with FormData
         const response = await fetch(`/api/campaigns/${campaignId}`, {
           method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(formData)
+          body: formDataWithFiles // Don't set Content-Type header, let browser set it for FormData
         });
         const result = await response.json();
         if (response.ok) {
@@ -4858,6 +5150,133 @@
         if (achievedConversionsInput) achievedConversionsInput.value = campaign.achieved.conversions || '';
       }
 
+      // Fill in existing images
+      const imageUploadContainer = form.querySelector('#imageUploadContainer');
+      if (imageUploadContainer) {
+        // Clear existing image items (keep the first one for new uploads)
+        const existingItems = imageUploadContainer.querySelectorAll('.image-upload-item');
+        existingItems.forEach(item => item.remove());
+        
+        // Display existing images from campaign
+        if (campaign.images && Array.isArray(campaign.images) && campaign.images.length > 0) {
+          campaign.images.forEach((imagePath, index) => {
+            if (imagePath && imagePath.trim() !== '') {
+              const existingImageItem = document.createElement('div');
+              existingImageItem.className = 'existing-image-item mb-4 p-3 border border-gray-300 rounded-md bg-gray-50';
+              existingImageItem.dataset.imagePath = imagePath;
+              existingImageItem.innerHTML = `
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-3">
+                    <img src="${imagePath}" alt="Campaign Image" class="w-20 h-20 object-cover rounded-md border">
+                    <div>
+                      <p class="text-sm font-medium text-gray-700">Existing Image ${index + 1}</p>
+                      <p class="text-xs text-gray-500">${imagePath}</p>
+                    </div>
+                  </div>
+                  <button type="button" class="remove-existing-image-btn btn-secondary py-1 px-3 text-sm text-red-600 hover:text-red-800 rounded-md" data-image-path="${imagePath}">
+                    Remove
+                  </button>
+                </div>
+              `;
+              imageUploadContainer.appendChild(existingImageItem);
+            }
+          });
+        }
+        
+        // Add one empty upload field for new images
+        const newImageItem = document.createElement('div');
+        newImageItem.className = 'image-upload-item mb-4';
+        newImageItem.innerHTML = `
+          <input type="file" accept="image/*" class="image-upload-input w-full p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
+          <p class="text-xs text-gray-500 mt-1">Upload a new image for this campaign (JPG, PNG, GIF - Max 5MB)</p>
+          <div class="image-preview mt-2 hidden">
+            <img src="" alt="Campaign Preview" class="max-w-xs h-32 object-cover rounded-md border">
+            <button type="button" class="remove-image-btn mt-1 text-sm text-red-600 hover:text-red-800">Remove Image</button>
+          </div>
+        `;
+        imageUploadContainer.appendChild(newImageItem);
+        
+        // Setup event handlers for existing images
+        const removeExistingImageBtns = imageUploadContainer.querySelectorAll('.remove-existing-image-btn');
+        console.log('=== SETUP REMOVE BUTTONS ===');
+        console.log('Found remove buttons:', removeExistingImageBtns.length);
+        removeExistingImageBtns.forEach((btn, index) => {
+          console.log(`Setting up remove button ${index + 1}:`, btn.dataset.imagePath);
+          btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Remove button clicked for image:', this.dataset.imagePath);
+            const imagePath = this.dataset.imagePath;
+            const imageItem = this.closest('.existing-image-item');
+            console.log('Image item found:', !!imageItem);
+            console.log('Current markedForRemoval:', imageItem?.dataset.markedForRemoval);
+            
+            if (confirm(`Are you sure you want to remove this image?`)) {
+              imageItem.classList.add('opacity-50');
+              imageItem.dataset.markedForRemoval = 'true';
+              this.textContent = 'Removed';
+              this.disabled = true;
+              this.classList.add('bg-gray-400');
+              this.classList.remove('hover:text-red-800');
+              console.log('✓ Image marked for removal:', imagePath);
+              console.log('Updated markedForRemoval:', imageItem.dataset.markedForRemoval);
+            } else {
+              console.log('User cancelled removal');
+            }
+          });
+        });
+        
+        // Setup event handlers for new image uploads
+        const newImageInput = newImageItem.querySelector('.image-upload-input');
+        const newRemoveBtn = newImageItem.querySelector('.remove-image-btn');
+        if (newImageInput) {
+          // Use the global setupImageHandling function if available, otherwise define inline
+          if (typeof setupImageHandling === 'function') {
+            setupImageHandling(newImageInput);
+          } else {
+            // Define inline handler
+            newImageInput.addEventListener('change', function(e) {
+              const file = e.target.files[0];
+              if (file) {
+                if (file.size > 5 * 1024 * 1024) {
+                  alert('File size must be less than 5MB');
+                  this.value = '';
+                  return;
+                }
+                if (!file.type.startsWith('image/')) {
+                  alert('Please select an image file');
+                  this.value = '';
+                  return;
+                }
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                  const preview = newImageInput.closest('.image-upload-item').querySelector('.image-preview');
+                  const previewImg = preview.querySelector('img');
+                  previewImg.src = e.target.result;
+                  preview.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+              }
+            });
+          }
+        }
+        if (newRemoveBtn) {
+          // Use the global setupRemoveImage function if available, otherwise define inline
+          if (typeof setupRemoveImage === 'function') {
+            setupRemoveImage(newRemoveBtn);
+          } else {
+            newRemoveBtn.addEventListener('click', function() {
+              const imageItem = this.closest('.image-upload-item');
+              const imageInput = imageItem.querySelector('.image-upload-input');
+              const preview = imageItem.querySelector('.image-preview');
+              imageInput.value = '';
+              preview.classList.add('hidden');
+              preview.querySelector('img').src = '';
+            });
+          }
+        }
+      }
+
       // Fill in channels
       const channelContainer = form.querySelector('#channelContainer');
       if (!channelContainer) {
@@ -4884,10 +5303,25 @@
             typeSelect.value = channel.type;
             console.log('Set channel type:', channel.type);
             
+            // Store the tag number before updateChannelFields (which might trigger auto-generation)
+            const existingTagNumber = channel.tagNumber || '';
+            
             // Update channel fields to show the correct inputs
             updateChannelFields(typeSelect);
             
-            // Fill values immediately for all channel types
+            // IMPORTANT: Set tag number IMMEDIATELY after updateChannelFields
+            // Use a small delay to ensure the input exists, but before auto-generation timeout (150ms)
+            setTimeout(() => {
+              const tagNumberInput = channelEntry.querySelector('.channelTagNumber');
+              if (tagNumberInput && existingTagNumber) {
+                tagNumberInput.value = existingTagNumber;
+                console.log('Set tagNumber AFTER updateChannelFields:', existingTagNumber);
+                // Mark that we're populating to prevent auto-generation
+                tagNumberInput.setAttribute('data-populating', 'true');
+              }
+            }, 50);
+            
+            // Fill values after fields are updated
             fillChannelEntryValues(channelEntry, channel);
           }
           
@@ -4953,8 +5387,15 @@
       
       const tagNumberInput = channelEntry.querySelector('.channelTagNumber');
       if (tagNumberInput) {
-        tagNumberInput.value = channel.tagNumber || '';
+        if (channel.tagNumber && channel.tagNumber.trim() !== '') {
+          tagNumberInput.value = channel.tagNumber;
+          // Mark as populated to prevent auto-generation
+          tagNumberInput.setAttribute('data-populating', 'true');
         console.log('Set tagNumber:', channel.tagNumber, 'in element:', tagNumberInput);
+        } else {
+          // Clear the data-populating attribute if no tag exists (allow auto-generation)
+          tagNumberInput.removeAttribute('data-populating');
+        }
       } else {
         console.log('TagNumber input not found');
       }
@@ -5363,10 +5804,29 @@
     // Impression Tracking Functions
     async function loadImpressionStats() {
       try {
-        console.log('=== LOAD IMPRESSION STATS FUNCTION CALLED ==='); // Clear debug log
-        console.log('Loading impression stats...'); // Debug log
+        console.log('=== LOAD IMPRESSION STATS FUNCTION CALLED ===');
+        const statsContainer = document.getElementById('impressionStats');
+        if (!statsContainer) {
+          console.error('impressionStats container not found');
+          alert('Error: Impression stats container not found');
+          return;
+        }
+        
+        // Show loading state
+        statsContainer.innerHTML = '<p class="text-gray-500">Loading statistics...</p>';
+        
+        console.log('Loading impression stats...');
         const response = await fetch('/api/impressions/stats');
-        console.log('Response status:', response.status); // Debug log
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('Error response:', errorData);
+          statsContainer.innerHTML = `<p class="text-red-500">Error loading impression stats: ${errorData.error || 'Server error'}</p>`;
+          alert('Error loading impression stats: ' + (errorData.error || 'Server error'));
+          return;
+        }
+        
         const stats = await response.json();
         console.log('Raw stats response:', stats); // Debug log
         console.log('Raw stats response type:', typeof stats); // Debug log
@@ -5376,14 +5836,23 @@
         console.log('Channels by type:', stats.channelsByType); // Debug log
         console.log('Impressions by platform:', stats.impressionsByPlatform); // Debug log
         
-        if (response.ok) {
+        if (stats) {
           displayImpressionStats(stats);
+          console.log('✓ Impression stats displayed successfully');
         } else {
-          alert('Error loading impression stats: ' + stats.error);
+          console.error('Invalid response format:', stats);
+          if (statsContainer) {
+            statsContainer.innerHTML = '<p class="text-red-500">Invalid response format from server</p>';
+          }
+          alert('Error: Invalid response format from server');
         }
       } catch (err) {
         console.error('Error loading impression stats:', err);
-        alert('Error loading impression statistics');
+        const statsContainer = document.getElementById('impressionStats');
+        if (statsContainer) {
+          statsContainer.innerHTML = `<p class="text-red-500">Error: ${err.message}</p>`;
+        }
+        alert('Error loading impression statistics: ' + err.message);
       }
     }
 
@@ -5586,18 +6055,47 @@
     }
 
     async function loadTagCounters() {
+      console.log('=== LOAD TAG COUNTERS FUNCTION CALLED ===');
       try {
-        const response = await fetch('/api/tags/counters');
-        const result = await response.json();
+        const container = document.getElementById('tagCountersContent');
+        if (!container) {
+          console.error('tagCountersContent container not found');
+          alert('Error: Tag counters container not found');
+          return;
+        }
         
-        if (response.ok) {
+        // Show loading state
+        container.innerHTML = '<p class="text-gray-500">Loading counters...</p>';
+        
+        const response = await fetch('/api/tags/counters');
+        console.log('Response status:', response.status);
+        
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('Error response:', errorData);
+          container.innerHTML = `<p class="text-red-500">Error loading tag counters: ${errorData.error || 'Server error'}</p>`;
+          alert('Error loading tag counters: ' + (errorData.error || 'Server error'));
+          return;
+        }
+        
+        const result = await response.json();
+        console.log('Tag counters result:', result);
+        
+        if (result && result.counters) {
           displayTagCounters(result);
+          console.log('✓ Tag counters displayed successfully');
         } else {
-          alert('Error loading tag counters: ' + result.error);
+          console.error('Invalid response format:', result);
+          container.innerHTML = '<p class="text-red-500">Invalid response format from server</p>';
+          alert('Error: Invalid response format from server');
         }
       } catch (err) {
         console.error('Error loading tag counters:', err);
-        alert('Error loading tag counters');
+        const container = document.getElementById('tagCountersContent');
+        if (container) {
+          container.innerHTML = `<p class="text-red-500">Error: ${err.message}</p>`;
+        }
+        alert('Error loading tag counters: ' + err.message);
       }
     }
 
@@ -5830,7 +6328,7 @@
     // Toggle impression tracking sections
     function toggleImpressionSection(sectionId) {
       // Hide all sections first
-      const sections = ['overallStats', 'updateImpressions', 'searchByTag', 'tagCounters', 'priorityChannels'];
+      const sections = ['overallStats', 'updateImpressions', 'searchByTag', 'tagCounters'];
       sections.forEach(id => {
         const section = document.getElementById(id);
         if (section) {
@@ -5848,11 +6346,22 @@
           loadImpressionStats();
         } else if (sectionId === 'tagCounters') {
           loadTagCounters();
-        } else if (sectionId === 'priorityChannels') {
-          showPriorityChannels();
         }
       }
     }
+
+    // Toggle Priority Channels in Channel Manager
+    window.togglePriorityChannels = function() {
+      const section = document.getElementById('priorityChannels');
+      if (!section) return;
+      
+      if (section.classList.contains('hidden')) {
+        section.classList.remove('hidden');
+        showPriorityChannels();
+      } else {
+        section.classList.add('hidden');
+      }
+    };
 
     // Auto-load impression stats when the section is shown
     window.showSection = function(sectionId) {
@@ -5928,6 +6437,7 @@
       else if (sectionId === 'impression-tracking') buttonTextToMatch = 'Impression Tracking';
       else if (sectionId === 'user-manager') buttonTextToMatch = 'User & Role Manager';
       else if (sectionId === 'campaigns-table') buttonTextToMatch = 'Campaigns Table';
+      else if (sectionId === 'channel-manager') buttonTextToMatch = 'Channel Manager';
 
       if (buttonTextToMatch) {
           menuButtons.forEach(button => {
@@ -6043,6 +6553,16 @@
       // Store original data for filtering
       originalCampaigns = campaigns;
       console.log('Original campaigns stored:', originalCampaigns.length);
+      
+      // Debug: Check which campaigns have images
+      const campaignsWithImages = campaigns.filter(c => c.images && (
+        (Array.isArray(c.images) && c.images.length > 0) ||
+        (typeof c.images === 'string' && c.images.trim() !== '')
+      ));
+      console.log('Campaigns with images:', campaignsWithImages.length);
+      campaignsWithImages.forEach(c => {
+        console.log(`Campaign ${c.campaignId} has ${Array.isArray(c.images) ? c.images.length : 1} image(s):`, c.images);
+      });
       
       // Apply filters and display
       applyFilters();
@@ -6195,6 +6715,33 @@
         const channelTags = campaign.channels ? 
           campaign.channels.map(channel => channel.channelTag).filter(tag => tag).join(', ') : '';
         
+        // Check for images - handle both array and string formats
+        const hasImages = campaign.images && (
+          (Array.isArray(campaign.images) && campaign.images.length > 0) ||
+          (typeof campaign.images === 'string' && campaign.images.trim() !== '')
+        );
+        const imageCount = Array.isArray(campaign.images) ? campaign.images.length : (campaign.images ? 1 : 0);
+        const campaignIdStr = campaign._id ? (typeof campaign._id === 'string' ? campaign._id : campaign._id.toString()) : '';
+        
+        // Build image button HTML
+        // Debug: Log image data for each campaign
+        console.log(`[IMAGE DEBUG] Campaign ${index + 1} (${campaign.campaignId || 'N/A'}):`);
+        console.log('  - campaign.images:', campaign.images);
+        console.log('  - typeof images:', typeof campaign.images);
+        console.log('  - isArray:', Array.isArray(campaign.images));
+        console.log('  - hasImages:', hasImages);
+        console.log('  - imageCount:', imageCount);
+        console.log('  - campaignIdStr:', campaignIdStr);
+        
+        let imageButtonHtml = '';
+        if (hasImages) {
+          imageButtonHtml = `<button onclick="toggleCampaignImages('${campaignIdStr}')" class="btn-secondary py-1 px-3 rounded-md text-sm" title="View Images (${imageCount})">📷 View (${imageCount})</button>`;
+        } else {
+          imageButtonHtml = '<span class="text-gray-400 text-sm">No images</span>';
+        }
+        
+        console.log(`[IMAGE DEBUG] Generated HTML for ${campaign.campaignId}:`, imageButtonHtml.substring(0, 80) + '...');
+        
         html += `
           <tr>
             <td><input type="radio" name="selected_campaign" value="${campaign._id}" class="select-campaign-radio"></td>
@@ -6219,11 +6766,31 @@
             <td>${channelTypes}</td>
             <td>${channelTags}</td>
             <td>${tagNumbers}</td>
+            <td>${imageButtonHtml}</td>
           </tr>
         `;
       });
       
+      console.log('[TABLE RENDER] Total HTML length:', html.length);
+      console.log('[TABLE RENDER] Number of rows:', filteredCampaigns.length);
+      if (html.length > 0) {
+        console.log('[TABLE RENDER] Sample row HTML (first 300 chars):', html.substring(0, 300));
+      }
+      
       tableBody.innerHTML = html;
+      
+      // Verify Image column is present
+      setTimeout(() => {
+        const firstRow = tableBody.querySelector('tr');
+        if (firstRow) {
+          const cells = firstRow.querySelectorAll('td');
+          console.log('[TABLE RENDER] Number of cells in first row:', cells.length);
+          const lastCell = cells[cells.length - 1];
+          if (lastCell) {
+            console.log('[TABLE RENDER] Last cell (Image column) content:', lastCell.innerHTML);
+          }
+        }
+      }, 100);
     }
     
     // Function to populate channel tag filter datalist from campaigns
@@ -6296,6 +6863,101 @@
         queryCampaign();
       }
     }
+
+    // Function to toggle campaign images display
+    window.toggleCampaignImages = function(campaignId) {
+      console.log('toggleCampaignImages called with ID:', campaignId);
+      console.log('originalCampaigns length:', originalCampaigns.length);
+      
+      // Find the campaign in originalCampaigns - try multiple matching strategies
+      const campaign = originalCampaigns.find(c => {
+        const cId = c._id ? (typeof c._id === 'string' ? c._id : c._id.toString()) : null;
+        return cId === campaignId || c._id === campaignId;
+      });
+      
+      console.log('Found campaign:', campaign);
+      console.log('Campaign images:', campaign?.images);
+      
+      if (!campaign) {
+        console.error('Campaign not found. Available IDs:', originalCampaigns.map(c => c._id));
+        alert('Campaign not found');
+        return;
+      }
+
+      // Check if images exist - handle both array and string formats
+      let imagesArray = [];
+      if (Array.isArray(campaign.images)) {
+        imagesArray = campaign.images.filter(img => img && img.trim() !== '');
+      } else if (typeof campaign.images === 'string' && campaign.images.trim() !== '') {
+        imagesArray = [campaign.images];
+      }
+      
+      if (imagesArray.length === 0) {
+        console.warn('No images found for campaign:', campaign.campaignId, 'Images data:', campaign.images);
+        alert('No images available for this campaign');
+        return;
+      }
+
+      console.log('Displaying images:', imagesArray);
+
+      // Find or create image modal/container
+      let imageModal = document.getElementById('campaign-images-modal');
+      
+      if (!imageModal) {
+        // Create modal if it doesn't exist
+        imageModal = document.createElement('div');
+        imageModal.id = 'campaign-images-modal';
+        imageModal.className = 'fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden';
+        imageModal.innerHTML = `
+          <div class="bg-white rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-y-auto relative">
+            <button onclick="closeCampaignImages()" class="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold">&times;</button>
+            <h3 class="text-xl font-semibold text-purple-700 mb-4">Campaign Images - ${campaign.campaignId || campaign.name || 'Unknown'}</h3>
+            <div id="campaign-images-container" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+          </div>
+        `;
+        document.body.appendChild(imageModal);
+      }
+
+      // Populate images
+      const container = document.getElementById('campaign-images-container');
+      container.innerHTML = imagesArray.map((imagePath, index) => {
+        // Ensure image path is properly formatted
+        const cleanPath = imagePath.trim();
+        console.log(`Loading image ${index + 1}:`, cleanPath);
+        
+        return `
+        <div class="relative">
+          <img src="${cleanPath}" 
+               alt="Campaign Image ${index + 1}" 
+               class="w-full h-48 object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-80"
+               onclick="window.open('${cleanPath}', '_blank')"
+               onerror="console.error('Failed to load image:', '${cleanPath}'); this.src='data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'200\' height=\'200\'%3E%3Crect width=\'200\' height=\'200\' fill=\'%23f3f4f6\'/%3E%3Ctext x=\'50%25\' y=\'50%25\' text-anchor=\'middle\' dy=\'.3em\' fill=\'%239ca3af\'%3EImage not found%3C/text%3E%3C/svg%3E';">
+          <div class="absolute bottom-2 right-2 bg-black bg-opacity-50 text-white text-xs px-2 py-1 rounded">
+            ${index + 1} / ${imagesArray.length}
+          </div>
+        </div>
+      `;
+      }).join('');
+
+      // Show modal
+      imageModal.classList.remove('hidden');
+    };
+
+    // Function to close campaign images modal
+    window.closeCampaignImages = function() {
+      const imageModal = document.getElementById('campaign-images-modal');
+      if (imageModal) {
+        imageModal.classList.add('hidden');
+      }
+    };
+
+    // Close modal when clicking outside
+    document.addEventListener('click', function(e) {
+      const imageModal = document.getElementById('campaign-images-modal');
+      if (imageModal && e.target === imageModal) {
+        closeCampaignImages();
+      }
+    });
 
     // Auto-load campaigns table when page loads
     document.addEventListener('DOMContentLoaded', function() {
@@ -6557,7 +7219,7 @@
       let imageCounter = 1;
       
       // Handle image upload for existing and new image inputs
-      function setupImageHandling(imageInput) {
+      window.setupImageHandling = function(imageInput) {
         imageInput.addEventListener('change', function(e) {
           const file = e.target.files[0];
           if (file) {
@@ -6589,7 +7251,7 @@
       }
       
       // Handle remove image button
-      function setupRemoveImage(removeBtn) {
+      window.setupRemoveImage = function(removeBtn) {
         removeBtn.addEventListener('click', function() {
           const imageItem = this.closest('.image-upload-item');
           const imageInput = imageItem.querySelector('.image-upload-input');
@@ -6802,6 +7464,17 @@
           if (!campaignsResponse.ok) throw new Error('Failed to fetch campaigns');
           const campaigns = await campaignsResponse.json();
           
+          console.log('Priority Channels Debug:', {
+            channelsCount: channels.length,
+            campaignsCount: campaigns.length,
+            sampleChannel: channels[0],
+            sampleCampaign: campaigns[0] ? {
+              campaignId: campaigns[0].campaignId,
+              channelsCount: campaigns[0].channels?.length || 0,
+              sampleChannel: campaigns[0].channels?.[0]
+            } : null
+          });
+          
           // Group channels by channel_type and channel_tag
           const priorityGroups = {};
           
@@ -6825,15 +7498,26 @@
               if (campaign.channels && Array.isArray(campaign.channels)) {
                 campaign.channels.forEach(campaignChannel => {
                   // Match by channel type and channel tag
-                  const typeMatch = campaignChannel.type === channel.channel_type;
-                  const tagMatch = !channel.channel_tag || campaignChannel.channelTag === channel.channel_tag;
+                  // Normalize values for comparison (trim whitespace, handle null/undefined, case-insensitive)
+                  const channelType = (channel.channel_type || '').trim().toLowerCase();
+                  const channelTag = (channel.channel_tag || '').trim().toLowerCase();
+                  const campaignType = (campaignChannel.type || '').trim().toLowerCase();
+                  // Check both channelTag and channel_tag field names
+                  const campaignTag = ((campaignChannel.channelTag || campaignChannel.channel_tag || '').toString()).trim().toLowerCase();
+                  
+                  const typeMatch = channelType && campaignType && channelType === campaignType;
+                  // Tag match: if channel has no tag, match any campaign channel; if channel has tag, must match exactly
+                  const tagMatch = !channelTag || (campaignTag && channelTag === campaignTag);
                   
                   if (typeMatch && tagMatch) {
-                    priorityGroups[key].total_impressions += campaignChannel.impressions || 0;
-                    priorityGroups[key].total_conversions += campaignChannel.conversions || 0;
+                    const impressions = parseInt(campaignChannel.impressions) || 0;
+                    const conversions = parseInt(campaignChannel.conversions) || 0;
+                    
+                    priorityGroups[key].total_impressions += impressions;
+                    priorityGroups[key].total_conversions += conversions;
                     
                     // Track unique marketing records
-                    if (!priorityGroups[key].marketing_ids.includes(campaign.campaignId)) {
+                    if (campaign.campaignId && !priorityGroups[key].marketing_ids.includes(campaign.campaignId)) {
                       priorityGroups[key].marketing_ids.push(campaign.campaignId);
                       priorityGroups[key].marketing_count++;
                     }
@@ -6843,6 +7527,8 @@
             });
           });
           
+          console.log('Priority Groups Result:', priorityGroups);
+          
           // Convert to array and sort by total impressions (descending)
           const priorityArray = Object.values(priorityGroups).sort((a, b) => {
             if (b.total_impressions !== a.total_impressions) {
@@ -6850,6 +7536,60 @@
             }
             return b.total_conversions - a.total_conversions;
           });
+          
+          // Update channels collection with calculated totals
+          if (priorityArray.length > 0) {
+            try {
+              const updates = priorityArray.map(group => ({
+                channel_id: group.channel_id,
+                Tot_impressions: group.total_impressions,
+                Tot_conversions: group.total_conversions
+              }));
+              
+              console.log('Sending bulk update for channels:', updates);
+              
+              const updateResponse = await fetch('/api/channels/bulk-update-totals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ updates })
+              });
+              
+              if (updateResponse.ok) {
+                const updateResult = await updateResponse.json();
+                console.log('Channels updated successfully:', updateResult);
+                
+                // Show success message
+                if (updateResult.updatedCount > 0) {
+                  // Add success message to the priority channels display
+                  const successMsg = document.createElement('div');
+                  successMsg.className = 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4';
+                  successMsg.innerHTML = `✓ Successfully updated ${updateResult.updatedCount} channel(s) in the channels collection.`;
+                  content.insertBefore(successMsg, content.firstChild);
+                  
+                  // Reload channels table if it's visible to reflect the updates
+                  const channelTableSection = document.getElementById('channel-table-section');
+                  if (channelTableSection && !channelTableSection.classList.contains('hidden')) {
+                    loadChannelsTable();
+                  }
+                }
+                
+                // Show warnings if there were errors
+                if (updateResult.errors && updateResult.errors.length > 0) {
+                  console.warn('Some channels failed to update:', updateResult.errors);
+                }
+              } else {
+                const errorText = await updateResponse.text();
+                console.error('Failed to update channels:', errorText);
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4';
+                errorMsg.innerHTML = `✗ Failed to update channels collection. Check console for details.`;
+                content.insertBefore(errorMsg, content.firstChild);
+              }
+            } catch (updateError) {
+              console.error('Error updating channels:', updateError);
+              alert('Error updating channels: ' + updateError.message);
+            }
+          }
           
           // Display results
           if (priorityArray.length === 0) {

@@ -1,5 +1,5 @@
 const express = require('express');
-const { MongoClient, ObjectId } = require('mongodb');
+const { MongoClient, ObjectId, GridFSBucket } = require('mongodb');
 const dotenv = require('dotenv');
 const excel = require('exceljs');
 const bodyParser = require('body-parser');
@@ -14,24 +14,10 @@ const port = process.env.PORT || 3000;
 const uri = process.env.MONGO_URI;
 
 let db;
+let gridFSBucket;
 
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadsDir);
-  },
-  filename: function (req, file, cb) {
-    // Generate unique filename with timestamp
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'campaign-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
+// Configure multer for file uploads - using memory storage for GridFS
+const storage = multer.memoryStorage();
 
 const upload = multer({ 
   storage: storage,
@@ -203,30 +189,96 @@ app.post('/api/campaigns', upload.fields([
   { name: 'campaignImage9', maxCount: 1 }
 ]), async (req, res) => {
   try {
+    console.log('=== REQUEST RECEIVED ===');
+    console.log('Request method:', req.method);
+    console.log('Request URL:', req.url);
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('req.body keys:', Object.keys(req.body || {}));
+    console.log('req.files exists:', !!req.files);
+    console.log('req.files keys:', req.files ? Object.keys(req.files) : 'N/A');
+    
     // Parse campaign data from form
     let campaignData;
     try {
       campaignData = JSON.parse(req.body.campaignData);
     } catch (parseError) {
+      console.error('✗ Failed to parse campaignData:', parseError);
       return res.status(400).json({ error: 'Invalid campaign data format' });
     }
     
     console.log('=== CAMPAIGN SUBMISSION DEBUG ===');
     console.log('Campaign data received:', JSON.stringify(campaignData, null, 2));
     
-    // Handle multiple image uploads
+    // Handle multiple image uploads - save to GridFS
+    console.log('=== IMAGE UPLOAD DEBUG ===');
+    console.log('req.files exists:', !!req.files);
+    console.log('req.files keys:', req.files ? Object.keys(req.files) : 'N/A');
+    
     if (req.files) {
       const images = [];
+      const uploadPromises = [];
+      
       Object.keys(req.files).forEach(fieldName => {
         if (req.files[fieldName] && req.files[fieldName][0]) {
-          images.push(`/uploads/${req.files[fieldName][0].filename}`);
+          const file = req.files[fieldName][0];
+          console.log(`Processing file from field ${fieldName}: ${file.originalname} (${file.size} bytes, ${file.mimetype})`);
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+          const filename = `campaign-${uniqueSuffix}${path.extname(file.originalname)}`;
+          
+          // Upload to GridFS
+          const uploadPromise = new Promise((resolve, reject) => {
+            const uploadStream = gridFSBucket.openUploadStream(filename, {
+              contentType: file.mimetype,
+              metadata: {
+                originalName: file.originalname,
+                uploadedAt: new Date()
+              }
+            });
+            
+            uploadStream.on('finish', () => {
+              const imagePath = `/api/images/${filename}`;
+              images.push(imagePath);
+              console.log(`✓ Image uploaded to GridFS: ${filename} -> ${imagePath}`);
+              resolve();
+            });
+            
+            uploadStream.on('error', (error) => {
+              console.error(`✗ Error uploading image ${filename}:`, error);
+              reject(error);
+            });
+            
+            // Write buffer to GridFS
+            uploadStream.end(file.buffer);
+          });
+          
+          uploadPromises.push(uploadPromise);
+        } else {
+          console.log(`Field ${fieldName}: No file or empty array`);
         }
       });
-      if (images.length > 0) {
-        campaignData.images = images;
-        console.log('Images uploaded:', images);
+      
+      // Wait for all images to upload
+      if (uploadPromises.length > 0) {
+        console.log(`Waiting for ${uploadPromises.length} image(s) to upload...`);
+        await Promise.all(uploadPromises);
+        if (images.length > 0) {
+          campaignData.images = images;
+          console.log('✓ Images array set in campaignData:', images);
+          console.log('✓ campaignData.images after assignment:', campaignData.images);
+        } else {
+          console.log('⚠ No images were successfully uploaded');
+        }
+      } else {
+        console.log('⚠ No image upload promises created');
       }
+    } else {
+      console.log('⚠ req.files is null/undefined - no images to process');
     }
+    
+    console.log('=== FINAL campaignData.images before save ===');
+    console.log('campaignData.images:', campaignData.images);
+    console.log('campaignData.images type:', typeof campaignData.images);
+    console.log('campaignData.images isArray:', Array.isArray(campaignData.images));
     
     if (campaignData.channels && Array.isArray(campaignData.channels)) {
       console.log('Channels found:', campaignData.channels.length);
@@ -244,16 +296,24 @@ app.post('/api/campaigns', upload.fields([
     
     // Validate tag numbers for uniqueness
     if (campaignData.channels && Array.isArray(campaignData.channels)) {
+      // Collect all tagNumbers, filtering out empty, null, undefined values
       const tagNumbers = campaignData.channels
         .map(channel => channel.tagNumber)
-        .filter(tag => tag && tag.trim() !== '');
+        .filter(tag => tag !== null && tag !== undefined && typeof tag === 'string' && tag.trim() !== '')
+        .map(tag => tag.trim()); // Normalize by trimming
+      
+      console.log(`Create: Total channels: ${campaignData.channels.length}, Valid tagNumbers: ${tagNumbers.length}`);
+      console.log(`Create: TagNumbers found: ${JSON.stringify(tagNumbers)}`);
       
       if (tagNumbers.length > 0) {
         // Check for duplicates within the same campaign
         const uniqueTags = new Set(tagNumbers);
         if (uniqueTags.size !== tagNumbers.length) {
+          // Find which tags are duplicated
+          const duplicates = tagNumbers.filter((tag, index) => tagNumbers.indexOf(tag) !== index);
+          console.log(`Create: Duplicate tags within campaign: ${JSON.stringify([...new Set(duplicates)])}`);
           return res.status(400).json({ 
-            error: 'Duplicate reference codes found within the campaign. Each reference code must be unique.' 
+            error: `Duplicate reference codes found within the campaign: ${[...new Set(duplicates)].join(', ')}. Each reference code must be unique.` 
           });
         }
         
@@ -295,12 +355,29 @@ app.post('/api/campaigns', upload.fields([
       campaignData.campaignId = await getNextCampaignId();
     }
     
+    console.log('=== SAVING CAMPAIGN TO DATABASE ===');
+    console.log('campaignId:', campaignData.campaignId);
+    console.log('campaignData.images before save:', campaignData.images);
+    console.log('campaignData keys:', Object.keys(campaignData));
+    
     const campaigns = db.collection('campaigns');
-    await campaigns.updateOne(
+    const result = await campaigns.updateOne(
       { campaignId: campaignData.campaignId },
       { $set: campaignData },
       { upsert: true }
     );
+    
+    console.log('=== DATABASE SAVE RESULT ===');
+    console.log('Matched:', result.matchedCount);
+    console.log('Modified:', result.modifiedCount);
+    console.log('Upserted:', result.upsertedCount);
+    
+    // Verify the saved document
+    const savedCampaign = await campaigns.findOne({ campaignId: campaignData.campaignId });
+    console.log('=== VERIFIED SAVED CAMPAIGN ===');
+    console.log('savedCampaign.images:', savedCampaign?.images);
+    console.log('savedCampaign.images type:', typeof savedCampaign?.images);
+    console.log('savedCampaign.images isArray:', Array.isArray(savedCampaign?.images));
 
     // Sync tag counters after save to ensure consistency
     await syncTagCounters();
@@ -313,35 +390,308 @@ app.post('/api/campaigns', upload.fields([
 });
 
 // PUT: Update campaign
-app.put('/api/campaigns/:campaignId', async (req, res) => {
+// PUT: Update campaign with multiple image uploads
+app.put('/api/campaigns/:campaignId', upload.fields([
+  { name: 'campaignImage0', maxCount: 1 },
+  { name: 'campaignImage1', maxCount: 1 },
+  { name: 'campaignImage2', maxCount: 1 },
+  { name: 'campaignImage3', maxCount: 1 },
+  { name: 'campaignImage4', maxCount: 1 },
+  { name: 'campaignImage5', maxCount: 1 },
+  { name: 'campaignImage6', maxCount: 1 },
+  { name: 'campaignImage7', maxCount: 1 },
+  { name: 'campaignImage8', maxCount: 1 },
+  { name: 'campaignImage9', maxCount: 1 }
+]), async (req, res) => {
   try {
     const campaignId = req.params.campaignId;
-    const campaignData = req.body;
     
-    if (!campaignData) {
+    console.log('=== UPDATE REQUEST RECEIVED ===');
+    console.log('Request method:', req.method);
+    console.log('Request URL:', req.url);
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('req.body keys:', Object.keys(req.body || {}));
+    console.log('req.files exists:', !!req.files);
+    console.log('req.files keys:', req.files ? Object.keys(req.files) : 'N/A');
+    
+    // Validate ObjectId format
+    if (!ObjectId.isValid(campaignId)) {
+      console.error(`Invalid ObjectId format: ${campaignId}`);
+      return res.status(400).json({ error: 'Invalid campaign ID format' });
+    }
+    
+    // Parse campaign data from FormData
+    let campaignData;
+    try {
+      // If it's FormData, campaignData will be in req.body.campaignData as a JSON string
+      if (req.body.campaignData) {
+        campaignData = JSON.parse(req.body.campaignData);
+      } else if (typeof req.body === 'string') {
+        campaignData = JSON.parse(req.body);
+      } else {
+        campaignData = req.body;
+      }
+    } catch (parseError) {
+      console.error('Error parsing campaign data:', parseError);
+      return res.status(400).json({ error: 'Invalid campaign data format' });
+    }
+    
+    if (!campaignData || Object.keys(campaignData).length === 0) {
+      console.error('No campaign data provided in request body');
       return res.status(400).json({ error: 'No campaign data provided' });
     }
+    
+    console.log(`PUT /api/campaigns/${campaignId}: Received campaign data with ${campaignData.channels?.length || 0} channels`);
+    console.log('=== CAMPAIGN DATA RECEIVED ===');
+    console.log('campaignData.imagesToRemove:', campaignData.imagesToRemove);
+    console.log('Type:', typeof campaignData.imagesToRemove);
+    console.log('Is array?', Array.isArray(campaignData.imagesToRemove));
+    if (campaignData.imagesToRemove) {
+      console.log('Length:', campaignData.imagesToRemove.length);
+      console.log('Contents:', JSON.stringify(campaignData.imagesToRemove));
+    }
+    
+    // Get existing campaign to preserve existing images if no new images are uploaded
+    const campaigns = db.collection('campaigns');
+    let objectId;
+    try {
+      objectId = new ObjectId(campaignId);
+    } catch (objectIdError) {
+      console.error(`Error creating ObjectId from ${campaignId}:`, objectIdError);
+      return res.status(400).json({ error: 'Invalid campaign ID format' });
+    }
+    
+    const existingCampaign = await campaigns.findOne({ _id: objectId });
+    if (!existingCampaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+    
+    // Handle multiple image uploads - save to GridFS
+    console.log('=== UPDATE IMAGE UPLOAD DEBUG ===');
+    console.log('req.files exists:', !!req.files);
+    console.log('req.files keys:', req.files ? Object.keys(req.files) : 'N/A');
+    console.log('Existing campaign images:', existingCampaign.images);
+    
+    if (req.files) {
+      const newImages = [];
+      const uploadPromises = [];
+      
+      Object.keys(req.files).forEach(fieldName => {
+        if (req.files[fieldName] && req.files[fieldName][0]) {
+          const file = req.files[fieldName][0];
+          console.log(`Processing file from field ${fieldName}: ${file.originalname} (${file.size} bytes, ${file.mimetype})`);
+          const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+          const filename = `campaign-${uniqueSuffix}${path.extname(file.originalname)}`;
+          
+          // Upload to GridFS
+          const uploadPromise = new Promise((resolve, reject) => {
+            const uploadStream = gridFSBucket.openUploadStream(filename, {
+              contentType: file.mimetype,
+              metadata: {
+                originalName: file.originalname,
+                uploadedAt: new Date()
+              }
+            });
+            
+            uploadStream.on('finish', () => {
+              const imagePath = `/api/images/${filename}`;
+              newImages.push(imagePath);
+              console.log(`✓ Image uploaded to GridFS: ${filename} -> ${imagePath}`);
+              resolve();
+            });
+            
+            uploadStream.on('error', (error) => {
+              console.error(`✗ Error uploading image ${filename}:`, error);
+              reject(error);
+            });
+            
+            // Write buffer to GridFS
+            uploadStream.end(file.buffer);
+          });
+          
+          uploadPromises.push(uploadPromise);
+        } else {
+          console.log(`Field ${fieldName}: No file or empty array`);
+        }
+      });
+      
+      // Wait for all images to upload
+      if (uploadPromises.length > 0) {
+        console.log(`Waiting for ${uploadPromises.length} image(s) to upload...`);
+        await Promise.all(uploadPromises);
+        if (newImages.length > 0) {
+          // Start with existing images, then add new ones
+          let finalImages = existingCampaign.images || [];
+          console.log('=== BEFORE REMOVAL ===');
+          console.log('Existing images:', finalImages);
+          console.log('campaignData.imagesToRemove:', campaignData.imagesToRemove);
+          console.log('Type of imagesToRemove:', typeof campaignData.imagesToRemove);
+          console.log('Is array?', Array.isArray(campaignData.imagesToRemove));
+          
+          // Remove images marked for removal
+          if (campaignData.imagesToRemove && Array.isArray(campaignData.imagesToRemove) && campaignData.imagesToRemove.length > 0) {
+            console.log('=== REMOVING IMAGES ===');
+            console.log('Images to remove:', campaignData.imagesToRemove);
+            console.log('Before filter - finalImages:', finalImages);
+            finalImages = finalImages.filter(img => {
+              const shouldKeep = !campaignData.imagesToRemove.includes(img);
+              console.log(`  Image: ${img}, Should keep: ${shouldKeep}`);
+              return shouldKeep;
+            });
+            console.log(`After filter - Removed ${campaignData.imagesToRemove.length} image(s), ${finalImages.length} remaining`);
+            console.log('After filter - finalImages:', finalImages);
+            
+            // Delete images from GridFS
+            for (const imagePath of campaignData.imagesToRemove) {
+              try {
+                // Extract filename from path (e.g., /api/images/campaign-123.jpg -> campaign-123.jpg)
+                const filename = imagePath.replace('/api/images/', '');
+                if (filename) {
+                  // Find the file in GridFS
+                  const filesCollection = db.collection('images.files');
+                  const file = await filesCollection.findOne({ filename: filename });
+                  if (file) {
+                    await gridFSBucket.delete(file._id);
+                    console.log(`✓ Deleted image from GridFS: ${filename}`);
+                  } else {
+                    console.log(`⚠ Image not found in GridFS: ${filename}`);
+                  }
+                }
+              } catch (deleteError) {
+                console.error(`✗ Error deleting image ${imagePath}:`, deleteError);
+              }
+            }
+          }
+          
+          // Add new images
+          campaignData.images = [...finalImages, ...newImages];
+          console.log('✓ Images array updated in campaignData:', campaignData.images);
+          console.log(`  - Existing images (after removal): ${finalImages.length}`);
+          console.log(`  - New images: ${newImages.length}`);
+          console.log(`  - Total images: ${campaignData.images.length}`);
+        } else {
+          // No new images, but may need to remove existing ones
+          let finalImages = existingCampaign.images || [];
+          if (campaignData.imagesToRemove && Array.isArray(campaignData.imagesToRemove)) {
+            console.log('=== REMOVING IMAGES (NO NEW UPLOADS) ===');
+            console.log('Images to remove:', campaignData.imagesToRemove);
+            finalImages = finalImages.filter(img => !campaignData.imagesToRemove.includes(img));
+            console.log(`Removed ${campaignData.imagesToRemove.length} image(s), ${finalImages.length} remaining`);
+            
+            // Delete images from GridFS
+            for (const imagePath of campaignData.imagesToRemove) {
+              try {
+                const filename = imagePath.replace('/api/images/', '');
+                if (filename) {
+                  const filesCollection = db.collection('images.files');
+                  const file = await filesCollection.findOne({ filename: filename });
+                  if (file) {
+                    await gridFSBucket.delete(file._id);
+                    console.log(`✓ Deleted image from GridFS: ${filename}`);
+                  }
+                }
+              } catch (deleteError) {
+                console.error(`✗ Error deleting image ${imagePath}:`, deleteError);
+              }
+            }
+          }
+          campaignData.images = finalImages;
+          console.log('⚠ No images were successfully uploaded, updated existing images list');
+        }
+      } else {
+        // No new uploads, but may need to remove existing ones
+        let finalImages = existingCampaign.images || [];
+        if (campaignData.imagesToRemove && Array.isArray(campaignData.imagesToRemove)) {
+          console.log('=== REMOVING IMAGES (NO NEW UPLOADS) ===');
+          console.log('Images to remove:', campaignData.imagesToRemove);
+          finalImages = finalImages.filter(img => !campaignData.imagesToRemove.includes(img));
+          console.log(`Removed ${campaignData.imagesToRemove.length} image(s), ${finalImages.length} remaining`);
+          
+          // Delete images from GridFS
+          for (const imagePath of campaignData.imagesToRemove) {
+            try {
+              const filename = imagePath.replace('/api/images/', '');
+              if (filename) {
+                const filesCollection = db.collection('images.files');
+                const file = await filesCollection.findOne({ filename: filename });
+                if (file) {
+                  await gridFSBucket.delete(file._id);
+                  console.log(`✓ Deleted image from GridFS: ${filename}`);
+                }
+              }
+            } catch (deleteError) {
+              console.error(`✗ Error deleting image ${imagePath}:`, deleteError);
+            }
+          }
+        }
+        campaignData.images = finalImages;
+        console.log('⚠ No image upload promises created, updated existing images list');
+      }
+    } else {
+      // No files uploaded, but may need to remove existing ones
+      let finalImages = existingCampaign.images || [];
+      if (campaignData.imagesToRemove && Array.isArray(campaignData.imagesToRemove)) {
+        console.log('=== REMOVING IMAGES (NO FILES) ===');
+        console.log('Images to remove:', campaignData.imagesToRemove);
+        finalImages = finalImages.filter(img => !campaignData.imagesToRemove.includes(img));
+        console.log(`Removed ${campaignData.imagesToRemove.length} image(s), ${finalImages.length} remaining`);
+        
+        // Delete images from GridFS
+        for (const imagePath of campaignData.imagesToRemove) {
+          try {
+            const filename = imagePath.replace('/api/images/', '');
+            if (filename) {
+              const filesCollection = db.collection('images.files');
+              const file = await filesCollection.findOne({ filename: filename });
+              if (file) {
+                await gridFSBucket.delete(file._id);
+                console.log(`✓ Deleted image from GridFS: ${filename}`);
+              }
+            }
+          } catch (deleteError) {
+            console.error(`✗ Error deleting image ${imagePath}:`, deleteError);
+          }
+        }
+      }
+      campaignData.images = finalImages;
+      console.log('⚠ req.files is null/undefined - updated existing images list');
+    }
+    
+    // Remove imagesToRemove from campaignData before saving (it's not a campaign field)
+    delete campaignData.imagesToRemove;
+    
+    console.log('=== FINAL campaignData.images before update ===');
+    console.log('campaignData.images:', campaignData.images);
+    console.log('campaignData.images type:', typeof campaignData.images);
+    console.log('campaignData.images isArray:', Array.isArray(campaignData.images));
     
     // Note: campaignId in URL is MongoDB _id, campaignId in body is human-readable ID
     // No need to compare them as they serve different purposes
     
     // Validate tag numbers for uniqueness
     if (campaignData.channels && Array.isArray(campaignData.channels)) {
+      // Collect all tagNumbers, filtering out empty, null, undefined values
       const tagNumbers = campaignData.channels
         .map(channel => channel.tagNumber)
-        .filter(tag => tag && tag.trim() !== '');
+        .filter(tag => tag !== null && tag !== undefined && typeof tag === 'string' && tag.trim() !== '')
+        .map(tag => tag.trim()); // Normalize by trimming
+      
+      console.log(`Update: Total channels: ${campaignData.channels.length}, Valid tagNumbers: ${tagNumbers.length}`);
+      console.log(`Update: TagNumbers found: ${JSON.stringify(tagNumbers)}`);
       
       if (tagNumbers.length > 0) {
         // Check for duplicates within the same campaign
         const uniqueTags = new Set(tagNumbers);
         if (uniqueTags.size !== tagNumbers.length) {
+          // Find which tags are duplicated
+          const duplicates = tagNumbers.filter((tag, index) => tagNumbers.indexOf(tag) !== index);
+          console.log(`Update: Duplicate tags within campaign: ${JSON.stringify([...new Set(duplicates)])}`);
           return res.status(400).json({ 
-            error: 'Duplicate reference codes found within the campaign. Each reference code must be unique.' 
+            error: `Duplicate reference codes found within the campaign: ${[...new Set(duplicates)].join(', ')}. Each reference code must be unique.` 
           });
         }
         
         // Check for duplicates across all existing campaigns (excluding current campaign)
-        const campaigns = db.collection('campaigns');
         const existingCampaigns = await campaigns.find({}).toArray();
         const existingTags = new Set();
         
@@ -375,16 +725,33 @@ app.put('/api/campaigns/:campaignId', async (req, res) => {
       }
     }
     
-    const campaigns = db.collection('campaigns');
+    // Update the campaign in database
+    console.log('=== SAVING UPDATED CAMPAIGN TO DATABASE ===');
+    console.log('campaignId (MongoDB _id):', campaignId);
+    console.log('campaignData.images before save:', campaignData.images);
+    console.log('campaignData keys:', Object.keys(campaignData));
+    
     const result = await campaigns.updateOne(
-      { _id: new ObjectId(campaignId) },
+      { _id: objectId },
       { $set: campaignData },
       { upsert: false }
     );
     
+    console.log('=== DATABASE UPDATE RESULT ===');
+    console.log('Matched:', result.matchedCount);
+    console.log('Modified:', result.modifiedCount);
+    
     if (result.matchedCount === 0) {
+      console.log(`Campaign not found with _id: ${campaignId}`);
       return res.status(404).json({ error: 'Campaign not found' });
     }
+    
+    // Verify the updated document
+    const updatedCampaign = await campaigns.findOne({ _id: objectId });
+    console.log('=== VERIFIED UPDATED CAMPAIGN ===');
+    console.log('updatedCampaign.images:', updatedCampaign?.images);
+    console.log('updatedCampaign.images type:', typeof updatedCampaign?.images);
+    console.log('updatedCampaign.images isArray:', Array.isArray(updatedCampaign?.images));
 
     // Sync tag counters after update to ensure consistency
     await syncTagCounters();
@@ -395,7 +762,19 @@ app.put('/api/campaigns/:campaignId', async (req, res) => {
     });
   } catch (err) {
     console.error('Error updating campaign:', err);
-    return res.status(500).json({ error: 'Server error' });
+    console.error('Error details:', {
+      message: err.message,
+      stack: err.stack,
+      campaignId: req.params.campaignId,
+      bodyKeys: req.body ? Object.keys(req.body) : 'no body'
+    });
+    
+    // Provide more specific error messages
+    if (err.message && err.message.includes('ObjectId')) {
+      return res.status(400).json({ error: 'Invalid campaign ID format', details: err.message });
+    }
+    
+    return res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
@@ -659,19 +1038,115 @@ app.delete('/api/campaigns/:campaignId', async (req, res) => {
     const campaignId = req.params.campaignId;
     const campaigns = db.collection('campaigns');
     
-    // Delete the campaign by MongoDB _id
-    const result = await campaigns.deleteOne({ _id: new ObjectId(campaignId) });
+    // Validate ObjectId format
+    if (!ObjectId.isValid(campaignId)) {
+      return res.status(400).json({ error: 'Invalid campaign ID format' });
+    }
+    
+    const objectId = new ObjectId(campaignId);
+    
+    // Find the campaign first to get image paths
+    const campaign = await campaigns.findOne({ _id: objectId });
+    
+    if (!campaign) {
+      console.log(`Campaign not found for deletion: ${campaignId}`);
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
+    
+    // Delete associated images from GridFS
+    console.log('=== CHECKING CAMPAIGN IMAGES ===');
+    console.log('campaign.images:', campaign.images);
+    console.log('campaign.images type:', typeof campaign.images);
+    console.log('campaign.images isArray:', Array.isArray(campaign.images));
+    
+    // Handle both array and string formats
+    let imagesToDelete = [];
+    if (campaign.images) {
+      if (Array.isArray(campaign.images)) {
+        imagesToDelete = campaign.images.filter(img => img && img.trim() !== '');
+      } else if (typeof campaign.images === 'string' && campaign.images.trim() !== '') {
+        imagesToDelete = [campaign.images.trim()];
+      }
+    }
+    
+    if (imagesToDelete.length > 0) {
+      console.log(`=== DELETING CAMPAIGN IMAGES ===`);
+      console.log(`Found ${imagesToDelete.length} image(s) to delete`);
+      console.log('Image paths:', imagesToDelete);
+      
+      // Check if gridFSBucket is initialized
+      if (!gridFSBucket) {
+        console.error('⚠ gridFSBucket is not initialized! Cannot delete images.');
+      } else {
+        let deletedCount = 0;
+        let errorCount = 0;
+        
+        for (const imagePath of imagesToDelete) {
+          try {
+            console.log(`Processing image: ${imagePath}`);
+            // Extract filename from path (e.g., /api/images/campaign-123.jpg -> campaign-123.jpg)
+            const filename = imagePath.replace('/api/images/', '').trim();
+            console.log(`Extracted filename: ${filename}`);
+            
+            if (filename) {
+              // Find the file in GridFS
+              const filesCollection = db.collection('images.files');
+              const file = await filesCollection.findOne({ filename: filename });
+              
+              if (file) {
+                console.log(`Found file in GridFS with _id: ${file._id}`);
+                await gridFSBucket.delete(file._id);
+                deletedCount++;
+                console.log(`✓ Deleted image from GridFS: ${filename}`);
+              } else {
+                console.log(`⚠ Image not found in GridFS: ${filename} (may have been deleted already)`);
+                // Try to find by partial match (in case path format is different)
+                const allFiles = await filesCollection.find({}).toArray();
+                const matchingFile = allFiles.find(f => f.filename.includes(filename) || filename.includes(f.filename));
+                if (matchingFile) {
+                  console.log(`Found matching file: ${matchingFile.filename}, deleting...`);
+                  await gridFSBucket.delete(matchingFile._id);
+                  deletedCount++;
+                  console.log(`✓ Deleted matching image from GridFS: ${matchingFile.filename}`);
+                }
+              }
+            } else {
+              console.log(`⚠ Could not extract filename from path: ${imagePath}`);
+            }
+          } catch (deleteError) {
+            errorCount++;
+            console.error(`✗ Error deleting image ${imagePath}:`, deleteError);
+            console.error('Error stack:', deleteError.stack);
+            // Continue with other images even if one fails
+          }
+        }
+        
+        console.log(`=== IMAGE DELETION SUMMARY ===`);
+        console.log(`Total images processed: ${imagesToDelete.length}`);
+        console.log(`Successfully deleted: ${deletedCount}`);
+        console.log(`Errors: ${errorCount}`);
+      }
+    } else {
+      console.log('No images found in campaign, skipping image deletion');
+      console.log('campaign.images value:', campaign.images);
+    }
+    
+    // Delete the campaign document
+    const result = await campaigns.deleteOne({ _id: objectId });
     
     if (result.deletedCount === 1) {
-      console.log(`Campaign deleted successfully: ${campaignId}`);
-      res.status(200).json({ message: 'Campaign deleted successfully' });
+      console.log(`✓ Campaign deleted successfully: ${campaignId}`);
+      res.status(200).json({ 
+        message: 'Campaign deleted successfully',
+        imagesDeleted: campaign.images ? campaign.images.length : 0
+      });
     } else {
       console.log(`Campaign not found for deletion: ${campaignId}`);
       res.status(404).json({ error: 'Campaign not found' });
     }
   } catch (err) {
     console.error('Error deleting campaign:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
@@ -1133,9 +1608,67 @@ app.get('/api/impressions/stats', async (req, res) => {
   }
 });
 
+// GET: Serve images from GridFS
+app.get('/api/images/:filename', async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    
+    // Check if file exists in GridFS
+    const files = db.collection('images.files');
+    const file = await files.findOne({ filename: filename });
+    
+    if (!file) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    // Set appropriate content type
+    res.set('Content-Type', file.contentType || 'image/jpeg');
+    res.set('Content-Length', file.length);
+    
+    // Stream file from GridFS
+    const downloadStream = gridFSBucket.openDownloadStreamByName(filename);
+    
+    downloadStream.on('error', (error) => {
+      console.error('Error streaming image:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Error streaming image' });
+      }
+    });
+    
+    downloadStream.pipe(res);
+  } catch (err) {
+    console.error('Error serving image:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// DELETE: Delete image from GridFS
+app.delete('/api/images/:filename', async (req, res) => {
+  try {
+    const filename = req.params.filename;
+    
+    // Find the file in GridFS
+    const files = db.collection('images.files');
+    const file = await files.findOne({ filename: filename });
+    
+    if (!file) {
+      return res.status(404).json({ error: 'Image not found' });
+    }
+    
+    // Delete from GridFS
+    await gridFSBucket.delete(file._id);
+    
+    res.json({ message: 'Image deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting image:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Static file serving should come after API routes
 app.use(express.static('.'));
 app.use('/public', express.static(path.join(__dirname, 'public')));
+// Keep /uploads for backward compatibility with existing images
 app.use('/uploads', express.static('uploads'));
 
 // ==================== Channel Collection API Endpoints ====================
@@ -1234,11 +1767,6 @@ app.get('/api/channels/export', async (req, res) => {
     const channels = db.collection('channels');
     const data = await channels.find().toArray();
     
-    if (data.length === 0) {
-      console.log('No channels found for export.');
-      return res.status(404).json({ error: 'No channels found to export' });
-    }
-
     const workbook = new excel.Workbook();
     const worksheet = workbook.addWorksheet('Channels');
     
@@ -1255,20 +1783,37 @@ app.get('/api/channels/export', async (req, res) => {
       { header: 'Updated At', key: 'updatedAt', width: 20 },
     ];
     
-    data.forEach(channel => {
+    if (data.length === 0) {
+      console.log('No channels found for export. Creating empty Excel file with headers.');
+      // Add a message row to indicate no data
       worksheet.addRow({
-        channel_id: channel.channel_id || '',
-        channel_type: channel.channel_type || '',
-        channel_tag: channel.channel_tag || '',
-        add_tag: channel.add_tag || '',
-        Mobile_no: channel.Mobile_no || '',
-        Company_name: channel.Company_name || '',
-        Tot_impressions: channel.Tot_impressions || 0,
-        Tot_conversions: channel.Tot_conversions || 0,
-        createdAt: channel.createdAt ? new Date(channel.createdAt).toLocaleString() : '',
-        updatedAt: channel.updatedAt ? new Date(channel.updatedAt).toLocaleString() : '',
+        channel_id: 'No channels found',
+        channel_type: '',
+        channel_tag: '',
+        add_tag: '',
+        Mobile_no: '',
+        Company_name: '',
+        Tot_impressions: '',
+        Tot_conversions: '',
+        createdAt: '',
+        updatedAt: ''
       });
-    });
+    } else {
+      data.forEach(channel => {
+        worksheet.addRow({
+          channel_id: channel.channel_id || '',
+          channel_type: channel.channel_type || '',
+          channel_tag: channel.channel_tag || '',
+          add_tag: channel.add_tag || '',
+          Mobile_no: channel.Mobile_no || '',
+          Company_name: channel.Company_name || '',
+          Tot_impressions: channel.Tot_impressions || 0,
+          Tot_conversions: channel.Tot_conversions || 0,
+          createdAt: channel.createdAt ? new Date(channel.createdAt).toLocaleString() : '',
+          updatedAt: channel.updatedAt ? new Date(channel.updatedAt).toLocaleString() : '',
+        });
+      });
+    }
     
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename=channels.xlsx');
@@ -1547,6 +2092,77 @@ app.put('/api/channels/:id', async (req, res) => {
   }
 });
 
+// POST: Bulk update channels with impressions and conversions from priority channels calculation
+app.post('/api/channels/bulk-update-totals', async (req, res) => {
+  try {
+    const { updates } = req.body; // Array of { channel_id, Tot_impressions, Tot_conversions }
+    
+    console.log('Bulk update request received:', { updatesCount: updates?.length || 0 });
+    
+    if (!Array.isArray(updates) || updates.length === 0) {
+      return res.status(400).json({ error: 'Updates array is required' });
+    }
+    
+    const channels = db.collection('channels');
+    let updatedCount = 0;
+    let matchedCount = 0;
+    const errors = [];
+    
+    for (const update of updates) {
+      const { channel_id, Tot_impressions, Tot_conversions } = update;
+      
+      if (!channel_id) {
+        errors.push({ channel_id: 'missing', error: 'channel_id is required' });
+        continue;
+      }
+      
+      try {
+        console.log(`Updating channel ${channel_id}: impressions=${Tot_impressions}, conversions=${Tot_conversions}`);
+        
+        const result = await channels.updateOne(
+          { channel_id: channel_id },
+          { 
+            $set: { 
+              Tot_impressions: Tot_impressions || 0,
+              Tot_conversions: Tot_conversions || 0,
+              updatedAt: new Date()
+            } 
+          }
+        );
+        
+        console.log(`Update result for ${channel_id}: matched=${result.matchedCount}, modified=${result.modifiedCount}`);
+        
+        if (result.matchedCount > 0) {
+          matchedCount++;
+          if (result.modifiedCount > 0) {
+            updatedCount++;
+          }
+        } else {
+          errors.push({ channel_id, error: 'Channel not found' });
+        }
+      } catch (err) {
+        console.error(`Error updating channel ${channel_id}:`, err);
+        errors.push({ channel_id, error: err.message });
+      }
+    }
+    
+    const response = {
+      message: `Updated ${updatedCount} channel(s)`,
+      updatedCount,
+      matchedCount,
+      total: updates.length,
+      errors: errors.length > 0 ? errors : undefined
+    };
+    
+    console.log('Bulk update completed:', response);
+    
+    res.status(200).json(response);
+  } catch (err) {
+    console.error('Error bulk updating channels:', err);
+    res.status(500).json({ error: 'Server error', details: err.message });
+  }
+});
+
 // DELETE: Delete a channel
 app.delete('/api/channels/:id', async (req, res) => {
   try {
@@ -1619,6 +2235,11 @@ async function setupDatabase() {
       await client.connect();
       console.log('Connected to MongoDB');
       db = client.db('event_campaign_db');
+      
+      // Initialize GridFS bucket for image storage
+      gridFSBucket = new GridFSBucket(db, { bucketName: 'images' });
+      console.log('GridFS bucket initialized for image storage');
+      
       const campaigns = db.collection('campaigns');
       await campaigns.createIndex({ campaignId: 1 }, { unique: true });
       console.log('Unique index on campaignId created');

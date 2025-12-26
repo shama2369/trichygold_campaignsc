@@ -41,7 +41,10 @@ router.post('/', async (req, res) => {
     const user = new User({ username, password: hashedPassword, email, roles: roles || [] });
     const db = req.app.locals.db;
     await db.collection('users').insertOne(user);
-    res.status(201).json({ message: 'User created', user });
+    // Exclude password from response
+    const userWithoutPassword = { ...user };
+    delete userWithoutPassword.password;
+    res.status(201).json({ message: 'User created', user: userWithoutPassword });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -73,7 +76,9 @@ router.get('/', async (req, res) => {
       return { ...user, roleNames: [] };
     }));
     
-    res.json(usersWithRoleNames);
+    // Exclude passwords from all users before sending response
+    const usersWithoutPasswords = usersWithRoleNames.map(({ password, ...user }) => user);
+    res.json(usersWithoutPasswords);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -85,7 +90,10 @@ router.get('/:id', async (req, res) => {
     const db = req.app.locals.db;
     const user = await db.collection('users').findOne({ _id: new ObjectId(req.params.id) });
     if (!user) return res.status(404).json({ error: 'User not found' });
-    res.json(user);
+    // Exclude password from response
+    const userWithoutPassword = { ...user };
+    delete userWithoutPassword.password;
+    res.json(userWithoutPassword);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
