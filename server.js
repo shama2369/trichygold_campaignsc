@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
+const rateLimit = require('express-rate-limit');
 
 dotenv.config();
 
@@ -16,22 +17,125 @@ const uri = process.env.MONGO_URI;
 let db;
 let gridFSBucket;
 
+// Allowed image MIME types
+const ALLOWED_MIME_TYPES = [
+  'image/jpeg',
+  'image/jpg', 
+  'image/png',
+  'image/gif',
+  'image/webp'
+];
+
+// Allowed file extensions
+const ALLOWED_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+
 // Configure multer for file uploads - using memory storage for GridFS
 const storage = multer.memoryStorage();
 
 const upload = multer({ 
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
+    fileSize: 5 * 1024 * 1024, // 5MB per file
+    files: 10, // Max 10 files per request
+    fieldSize: 10 * 1024 * 1024, // 10MB for other form fields
+    fields: 50, // Max 50 non-file fields
+    parts: 60 // Max 60 parts total (files + fields)
   },
   fileFilter: function (req, file, cb) {
-    // Check if file is an image
-    if (file.mimetype.startsWith('image/')) {
-      cb(null, true);
-    } else {
-      cb(new Error('Only image files are allowed!'), false);
+    // 1. Check MIME type (first line of defense)
+    if (!ALLOWED_MIME_TYPES.includes(file.mimetype.toLowerCase())) {
+      return cb(new Error(`Invalid file type. Only ${ALLOWED_EXTENSIONS.join(', ')} images are allowed.`), false);
     }
+    
+    // 2. Check file extension (second line of defense)
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_EXTENSIONS.includes(ext)) {
+      return cb(new Error(`Invalid file extension. Only ${ALLOWED_EXTENSIONS.join(', ')} files are allowed.`), false);
+    }
+    
+    // 3. Validate filename (prevent path traversal)
+    const filename = path.basename(file.originalname);
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      return cb(new Error('Invalid filename. Path traversal not allowed.'), false);
+    }
+    
+    cb(null, true);
   }
+});
+
+// Magic number validation function (validates actual file content)
+function validateImageMagicNumber(buffer, mimetype) {
+  if (!buffer || buffer.length < 4) return false;
+  
+  const firstBytes = buffer.slice(0, 4);
+  const hex = Array.from(firstBytes).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  
+  // JPEG: FF D8 FF
+  if (mimetype === 'image/jpeg' || mimetype === 'image/jpg') {
+    return hex.startsWith('FFD8FF');
+  }
+  
+  // PNG: 89 50 4E 47
+  if (mimetype === 'image/png') {
+    return hex === '89504E47';
+  }
+  
+  // GIF: 47 49 46 38
+  if (mimetype === 'image/gif') {
+    return hex.startsWith('47494638');
+  }
+  
+  // WebP: Check for RIFF...WEBP
+  if (mimetype === 'image/webp') {
+    if (buffer.length < 12) return false;
+    return buffer.slice(0, 4).toString() === 'RIFF' &&
+           buffer.slice(8, 12).toString() === 'WEBP';
+  }
+  
+  return false;
+}
+
+// Middleware to validate uploaded files after multer processing
+function validateUploadedFiles(req, res, next) {
+  if (!req.files) return next();
+  
+  const errors = [];
+  
+  Object.keys(req.files).forEach(fieldName => {
+    if (req.files[fieldName] && req.files[fieldName][0]) {
+      const file = req.files[fieldName][0];
+      
+      // Validate magic number (actual file content)
+      if (!validateImageMagicNumber(file.buffer, file.mimetype)) {
+        errors.push(`File ${file.originalname} does not match its declared type. Possible file spoofing.`);
+      }
+      
+      // Additional size check (defense in depth)
+      if (file.size > 5 * 1024 * 1024) {
+        errors.push(`File ${file.originalname} exceeds 5MB limit.`);
+      }
+    }
+  });
+  
+  if (errors.length > 0) {
+    console.error('File validation failed:', errors);
+    return res.status(400).json({ 
+      error: 'File validation failed', 
+      details: errors 
+    });
+  }
+  
+  next();
+}
+
+// Rate limiting for upload endpoints
+const uploadLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // Max 10 upload requests per window per IP
+  message: 'Too many upload requests, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: false, // Count all requests, even successful ones
 });
 
 // User and Roles routes
@@ -176,7 +280,7 @@ app.get('/api/debug/campaigns', async (req, res) => {
 });
 
 // POST: Create or update campaign with multiple image uploads
-app.post('/api/campaigns', upload.fields([
+app.post('/api/campaigns', uploadLimiter, upload.fields([
   { name: 'campaignImage0', maxCount: 1 },
   { name: 'campaignImage1', maxCount: 1 },
   { name: 'campaignImage2', maxCount: 1 },
@@ -187,7 +291,7 @@ app.post('/api/campaigns', upload.fields([
   { name: 'campaignImage7', maxCount: 1 },
   { name: 'campaignImage8', maxCount: 1 },
   { name: 'campaignImage9', maxCount: 1 }
-]), async (req, res) => {
+]), validateUploadedFiles, async (req, res) => {
   try {
     console.log('=== REQUEST RECEIVED ===');
     console.log('Request method:', req.method);
@@ -214,6 +318,9 @@ app.post('/api/campaigns', upload.fields([
     console.log('req.files exists:', !!req.files);
     console.log('req.files keys:', req.files ? Object.keys(req.files) : 'N/A');
     
+    // Track uploaded filenames for cleanup on failure
+    const uploadedFilenames = [];
+    
     if (req.files) {
       const images = [];
       const uploadPromises = [];
@@ -224,6 +331,7 @@ app.post('/api/campaigns', upload.fields([
           console.log(`Processing file from field ${fieldName}: ${file.originalname} (${file.size} bytes, ${file.mimetype})`);
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
           const filename = `campaign-${uniqueSuffix}${path.extname(file.originalname)}`;
+          uploadedFilenames.push(filename); // Track for cleanup
           
           // Upload to GridFS
           const uploadPromise = new Promise((resolve, reject) => {
@@ -244,6 +352,11 @@ app.post('/api/campaigns', upload.fields([
             
             uploadStream.on('error', (error) => {
               console.error(`✗ Error uploading image ${filename}:`, error);
+              // Remove from tracking array on error
+              const index = uploadedFilenames.indexOf(filename);
+              if (index > -1) {
+                uploadedFilenames.splice(index, 1);
+              }
               reject(error);
             });
             
@@ -309,12 +422,26 @@ app.post('/api/campaigns', upload.fields([
         // Check for duplicates within the same campaign
         const uniqueTags = new Set(tagNumbers);
         if (uniqueTags.size !== tagNumbers.length) {
-          // Find which tags are duplicated
-          const duplicates = tagNumbers.filter((tag, index) => tagNumbers.indexOf(tag) !== index);
-          console.log(`Create: Duplicate tags within campaign: ${JSON.stringify([...new Set(duplicates)])}`);
-          return res.status(400).json({ 
-            error: `Duplicate reference codes found within the campaign: ${[...new Set(duplicates)].join(', ')}. Each reference code must be unique.` 
+          // Find tags that appear multiple times with their counts
+          const tagCounts = {};
+          tagNumbers.forEach(tag => {
+            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
           });
+          
+          // Only include tags that appear more than once
+          const actualDuplicates = Object.entries(tagCounts)
+            .filter(([tag, count]) => count > 1)
+            .map(([tag, count]) => `${tag} (appears ${count} times)`);
+          
+          console.log(`Create: Duplicate tags within campaign: ${JSON.stringify(actualDuplicates)}`);
+          console.log(`Create: Full tagNumbers array: ${JSON.stringify(tagNumbers)}`);
+          console.log(`Create: Tag counts: ${JSON.stringify(tagCounts)}`);
+          
+          if (actualDuplicates.length > 0) {
+            return res.status(400).json({ 
+              error: `Duplicate reference codes found within the campaign: ${actualDuplicates.join(', ')}. Each reference code must be unique.` 
+            });
+          }
         }
         
         // Check for duplicates across all existing campaigns (excluding current campaign if updating)
@@ -361,37 +488,81 @@ app.post('/api/campaigns', upload.fields([
     console.log('campaignData keys:', Object.keys(campaignData));
     
     const campaigns = db.collection('campaigns');
-    const result = await campaigns.updateOne(
-      { campaignId: campaignData.campaignId },
-      { $set: campaignData },
-      { upsert: true }
-    );
     
-    console.log('=== DATABASE SAVE RESULT ===');
-    console.log('Matched:', result.matchedCount);
-    console.log('Modified:', result.modifiedCount);
-    console.log('Upserted:', result.upsertedCount);
-    
-    // Verify the saved document
-    const savedCampaign = await campaigns.findOne({ campaignId: campaignData.campaignId });
-    console.log('=== VERIFIED SAVED CAMPAIGN ===');
-    console.log('savedCampaign.images:', savedCampaign?.images);
-    console.log('savedCampaign.images type:', typeof savedCampaign?.images);
-    console.log('savedCampaign.images isArray:', Array.isArray(savedCampaign?.images));
+    try {
+      const result = await campaigns.updateOne(
+        { campaignId: campaignData.campaignId },
+        { $set: campaignData },
+        { upsert: true }
+      );
+      
+      console.log('=== DATABASE SAVE RESULT ===');
+      console.log('Matched:', result.matchedCount);
+      console.log('Modified:', result.modifiedCount);
+      console.log('Upserted:', result.upsertedCount);
+      
+      // Verify the saved document
+      const savedCampaign = await campaigns.findOne({ campaignId: campaignData.campaignId });
+      console.log('=== VERIFIED SAVED CAMPAIGN ===');
+      console.log('savedCampaign.images:', savedCampaign?.images);
+      console.log('savedCampaign.images type:', typeof savedCampaign?.images);
+      console.log('savedCampaign.images isArray:', Array.isArray(savedCampaign?.images));
 
-    // Sync tag counters after save to ensure consistency
-    await syncTagCounters();
-    
-    res.status(200).json({ message: 'Campaign saved successfully', campaignId: campaignData.campaignId });
+      // Sync tag counters after save to ensure consistency
+      await syncTagCounters();
+      
+      res.status(200).json({ message: 'Campaign saved successfully', campaignId: campaignData.campaignId });
+    } catch (dbErr) {
+      // Handle duplicate key errors (MongoDB error code 11000)
+      if (dbErr.code === 11000 || dbErr.codeName === 'DuplicateKey') {
+        console.error('Duplicate key error during campaign creation:', dbErr);
+        const duplicateField = dbErr.keyPattern ? Object.keys(dbErr.keyPattern)[0] : 'campaignId';
+        return res.status(409).json({ 
+          error: `Duplicate ${duplicateField} detected. This may be due to concurrent requests. Please refresh and try again.`,
+          duplicateField: duplicateField,
+          details: 'A campaign with this identifier already exists or was just created by another request.'
+        });
+      }
+      // Re-throw other database errors to be caught by outer catch
+      throw dbErr;
+    }
   } catch (err) {
     console.error('Error saving campaign:', err);
-    res.status(500).json({ error: 'Server error' });
+    
+    // Cleanup: Delete uploaded images if campaign save failed
+    if (uploadedFilenames && uploadedFilenames.length > 0) {
+      console.log(`⚠ Campaign creation failed. Cleaning up ${uploadedFilenames.length} uploaded image(s)...`);
+      
+      for (const filename of uploadedFilenames) {
+        try {
+          // Find the file in GridFS by filename
+          const filesCollection = db.collection('images.files');
+          const file = await filesCollection.findOne({ filename: filename });
+          if (file) {
+            await gridFSBucket.delete(file._id);
+            console.log(`✓ Cleaned up orphaned image: ${filename} (ID: ${file._id})`);
+          } else {
+            console.log(`⚠ Image not found in GridFS for cleanup: ${filename}`);
+          }
+        } catch (cleanupError) {
+          console.error(`✗ Error cleaning up image ${filename}:`, cleanupError);
+          // Continue cleanup even if one fails
+        }
+      }
+    }
+    
+    // If it's already a 409 response, don't override it
+    if (err.status === 409) {
+      throw err;
+    }
+    
+    res.status(500).json({ error: 'Server error', details: err.message });
   }
 });
 
 // PUT: Update campaign
 // PUT: Update campaign with multiple image uploads
-app.put('/api/campaigns/:campaignId', upload.fields([
+app.put('/api/campaigns/:campaignId', uploadLimiter, upload.fields([
   { name: 'campaignImage0', maxCount: 1 },
   { name: 'campaignImage1', maxCount: 1 },
   { name: 'campaignImage2', maxCount: 1 },
@@ -402,7 +573,7 @@ app.put('/api/campaigns/:campaignId', upload.fields([
   { name: 'campaignImage7', maxCount: 1 },
   { name: 'campaignImage8', maxCount: 1 },
   { name: 'campaignImage9', maxCount: 1 }
-]), async (req, res) => {
+]), validateUploadedFiles, async (req, res) => {
   try {
     const campaignId = req.params.campaignId;
     
@@ -472,6 +643,9 @@ app.put('/api/campaigns/:campaignId', upload.fields([
     console.log('req.files keys:', req.files ? Object.keys(req.files) : 'N/A');
     console.log('Existing campaign images:', existingCampaign.images);
     
+    // Track newly uploaded filenames for cleanup on failure
+    const uploadedFilenames = [];
+    
     if (req.files) {
       const newImages = [];
       const uploadPromises = [];
@@ -482,6 +656,7 @@ app.put('/api/campaigns/:campaignId', upload.fields([
           console.log(`Processing file from field ${fieldName}: ${file.originalname} (${file.size} bytes, ${file.mimetype})`);
           const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
           const filename = `campaign-${uniqueSuffix}${path.extname(file.originalname)}`;
+          uploadedFilenames.push(filename); // Track for cleanup
           
           // Upload to GridFS
           const uploadPromise = new Promise((resolve, reject) => {
@@ -502,6 +677,11 @@ app.put('/api/campaigns/:campaignId', upload.fields([
             
             uploadStream.on('error', (error) => {
               console.error(`✗ Error uploading image ${filename}:`, error);
+              // Remove from tracking array on error
+              const index = uploadedFilenames.indexOf(filename);
+              if (index > -1) {
+                uploadedFilenames.splice(index, 1);
+              }
               reject(error);
             });
             
@@ -683,12 +863,26 @@ app.put('/api/campaigns/:campaignId', upload.fields([
         // Check for duplicates within the same campaign
         const uniqueTags = new Set(tagNumbers);
         if (uniqueTags.size !== tagNumbers.length) {
-          // Find which tags are duplicated
-          const duplicates = tagNumbers.filter((tag, index) => tagNumbers.indexOf(tag) !== index);
-          console.log(`Update: Duplicate tags within campaign: ${JSON.stringify([...new Set(duplicates)])}`);
-          return res.status(400).json({ 
-            error: `Duplicate reference codes found within the campaign: ${[...new Set(duplicates)].join(', ')}. Each reference code must be unique.` 
+          // Find tags that appear multiple times with their counts
+          const tagCounts = {};
+          tagNumbers.forEach(tag => {
+            tagCounts[tag] = (tagCounts[tag] || 0) + 1;
           });
+          
+          // Only include tags that appear more than once
+          const actualDuplicates = Object.entries(tagCounts)
+            .filter(([tag, count]) => count > 1)
+            .map(([tag, count]) => `${tag} (appears ${count} times)`);
+          
+          console.log(`Update: Duplicate tags within campaign: ${JSON.stringify(actualDuplicates)}`);
+          console.log(`Update: Full tagNumbers array: ${JSON.stringify(tagNumbers)}`);
+          console.log(`Update: Tag counts: ${JSON.stringify(tagCounts)}`);
+          
+          if (actualDuplicates.length > 0) {
+            return res.status(400).json({ 
+              error: `Duplicate reference codes found within the campaign: ${actualDuplicates.join(', ')}. Each reference code must be unique.` 
+            });
+          }
         }
         
         // Check for duplicates across all existing campaigns (excluding current campaign)
@@ -731,37 +925,80 @@ app.put('/api/campaigns/:campaignId', upload.fields([
     console.log('campaignData.images before save:', campaignData.images);
     console.log('campaignData keys:', Object.keys(campaignData));
     
-    const result = await campaigns.updateOne(
-      { _id: objectId },
-      { $set: campaignData },
-      { upsert: false }
-    );
-    
-    console.log('=== DATABASE UPDATE RESULT ===');
-    console.log('Matched:', result.matchedCount);
-    console.log('Modified:', result.modifiedCount);
-    
-    if (result.matchedCount === 0) {
-      console.log(`Campaign not found with _id: ${campaignId}`);
-      return res.status(404).json({ error: 'Campaign not found' });
-    }
-    
-    // Verify the updated document
-    const updatedCampaign = await campaigns.findOne({ _id: objectId });
-    console.log('=== VERIFIED UPDATED CAMPAIGN ===');
-    console.log('updatedCampaign.images:', updatedCampaign?.images);
-    console.log('updatedCampaign.images type:', typeof updatedCampaign?.images);
-    console.log('updatedCampaign.images isArray:', Array.isArray(updatedCampaign?.images));
+    try {
+      const result = await campaigns.updateOne(
+        { _id: objectId },
+        { $set: campaignData },
+        { upsert: false }
+      );
+      
+      console.log('=== DATABASE UPDATE RESULT ===');
+      console.log('Matched:', result.matchedCount);
+      console.log('Modified:', result.modifiedCount);
+      
+      if (result.matchedCount === 0) {
+        console.log(`Campaign not found with _id: ${campaignId}`);
+        return res.status(404).json({ error: 'Campaign not found' });
+      }
+      
+      // Verify the updated document
+      const updatedCampaign = await campaigns.findOne({ _id: objectId });
+      console.log('=== VERIFIED UPDATED CAMPAIGN ===');
+      console.log('updatedCampaign.images:', updatedCampaign?.images);
+      console.log('updatedCampaign.images type:', typeof updatedCampaign?.images);
+      console.log('updatedCampaign.images isArray:', Array.isArray(updatedCampaign?.images));
 
-    // Sync tag counters after update to ensure consistency
-    await syncTagCounters();
-    
-    return res.status(200).json({ 
-      message: 'Campaign updated successfully', 
-      campaignId 
-    });
+      // Sync tag counters after update to ensure consistency
+      await syncTagCounters();
+      
+      return res.status(200).json({ 
+        message: 'Campaign updated successfully', 
+        campaignId 
+      });
+    } catch (dbErr) {
+      // Handle duplicate key errors (MongoDB error code 11000)
+      if (dbErr.code === 11000 || dbErr.codeName === 'DuplicateKey') {
+        console.error('Duplicate key error during campaign update:', dbErr);
+        const duplicateField = dbErr.keyPattern ? Object.keys(dbErr.keyPattern)[0] : 'campaignId';
+        return res.status(409).json({ 
+          error: `Duplicate ${duplicateField} detected. This may be due to concurrent requests. Please refresh and try again.`,
+          duplicateField: duplicateField,
+          details: 'A campaign with this identifier already exists or was just updated by another request.'
+        });
+      }
+      // Re-throw other database errors to be caught by outer catch
+      throw dbErr;
+    }
   } catch (err) {
     console.error('Error updating campaign:', err);
+    
+    // Cleanup: Delete newly uploaded images if campaign update failed
+    if (uploadedFilenames && uploadedFilenames.length > 0) {
+      console.log(`⚠ Campaign update failed. Cleaning up ${uploadedFilenames.length} newly uploaded image(s)...`);
+      
+      for (const filename of uploadedFilenames) {
+        try {
+          // Find the file in GridFS by filename
+          const filesCollection = db.collection('images.files');
+          const file = await filesCollection.findOne({ filename: filename });
+          if (file) {
+            await gridFSBucket.delete(file._id);
+            console.log(`✓ Cleaned up orphaned image: ${filename} (ID: ${file._id})`);
+          } else {
+            console.log(`⚠ Image not found in GridFS for cleanup: ${filename}`);
+          }
+        } catch (cleanupError) {
+          console.error(`✗ Error cleaning up image ${filename}:`, cleanupError);
+          // Continue cleanup even if one fails
+        }
+      }
+    }
+    
+    // If it's already a 409 response, don't override it
+    if (err.status === 409) {
+      throw err;
+    }
+    
     console.error('Error details:', {
       message: err.message,
       stack: err.stack,
@@ -826,10 +1063,24 @@ app.get('/api/campaigns/tag/:tagNumber', async (req, res) => {
 
 // GET: Export a single campaign to Excel
 app.get('/api/campaigns/:campaignId/export', async (req, res) => {
-  const campaignId = req.params.campaignId;
   try {
     const campaigns = db.collection('campaigns');
-    const campaign = await campaigns.findOne({ campaignId });
+    let campaign = null;
+    
+    // Try to find by ObjectId first (if it's a valid ObjectId)
+    if (ObjectId.isValid(req.params.campaignId)) {
+      try {
+        campaign = await findCampaignByObjectId(req.params.campaignId);
+      } catch (err) {
+        // If ObjectId lookup fails, try campaignId lookup below
+      }
+    }
+    
+    // If not found by ObjectId, try to find by human-readable campaignId
+    if (!campaign) {
+      campaign = await campaigns.findOne({ campaignId: req.params.campaignId });
+    }
+    
     if (!campaign) {
       return res.status(404).json({ error: 'Campaign not found' });
     }
@@ -889,10 +1140,13 @@ app.get('/api/campaigns/:campaignId/export', async (req, res) => {
       channels: channelDetails,
     });
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=campaign_${campaignId}.xlsx`);
+    res.setHeader('Content-Disposition', `attachment; filename=campaign_${campaign.campaignId || campaign._id}.xlsx`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (err) {
+    if (err.message === 'Invalid ObjectId format') {
+      return res.status(400).json({ error: 'Invalid campaign ID format' });
+    }
     console.error('Error exporting campaign:', err);
     res.status(500).json({ error: 'Server error during export' });
   }
@@ -904,11 +1158,6 @@ app.get('/api/campaigns/export', async (req, res) => {
     const campaigns = db.collection('campaigns');
     const data = await campaigns.find().toArray();
     
-    if (data.length === 0) {
-        console.log('No campaigns found for export.');
-        return res.status(404).json({ error: 'No campaigns found to export' });
-    }
-
     const workbook = new excel.Workbook();
     const worksheet = workbook.addWorksheet('Campaigns');
     
@@ -924,7 +1173,22 @@ app.get('/api/campaigns/export', async (req, res) => {
       { header: 'Channels', key: 'channels', width: 50 },
     ];
     
-    data.forEach(campaign => {
+    if (data.length === 0) {
+      console.log('No campaigns found for export. Creating empty Excel file with headers.');
+      // Add a message row to indicate no data
+      worksheet.addRow({
+        campaignId: 'No marketing records found',
+        name: '',
+        description: '',
+        startDate: '',
+        endDate: '',
+        budget: '',
+        status: '',
+        jobAssignedTo: '',
+        channels: ''
+      });
+    } else {
+      data.forEach(campaign => {
       const channelDetails = campaign.channels ? campaign.channels.map(channel => {
         let baseInfo = '';
         if (channel.type === 'Social Media') {
@@ -960,17 +1224,18 @@ app.get('/api/campaigns/export', async (req, res) => {
         return baseInfo;
       }).join('; ') : '';
       
-      worksheet.addRow({
-        campaignId: campaign.campaignId,
-        name: campaign.name,
-        description: campaign.description,
-        startDate: campaign.startDate,
-        endDate: campaign.endDate,
-        budget: campaign.budget,
-        status: campaign.status,
-        channels: channelDetails,
+        worksheet.addRow({
+          campaignId: campaign.campaignId,
+          name: campaign.name,
+          description: campaign.description,
+          startDate: campaign.startDate,
+          endDate: campaign.endDate,
+          budget: campaign.budget,
+          status: campaign.status,
+          channels: channelDetails,
+        });
       });
-    });
+    }
     
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename=campaigns.xlsx');
@@ -1017,15 +1282,32 @@ app.get('/api/campaigns/channel-tags', async (req, res) => {
 app.get('/api/campaigns/:campaignId', async (req, res) => {
   console.log(`Received GET request for campaignId: ${req.params.campaignId}`);
   try {
-    const campaignId = req.params.campaignId;
     const campaigns = db.collection('campaigns');
-    const campaign = await campaigns.findOne({ campaignId });
+    let campaign = null;
+    
+    // Try to find by ObjectId first (if it's a valid ObjectId)
+    if (ObjectId.isValid(req.params.campaignId)) {
+      try {
+        campaign = await findCampaignByObjectId(req.params.campaignId);
+      } catch (err) {
+        // If ObjectId lookup fails, try campaignId lookup below
+      }
+    }
+    
+    // If not found by ObjectId, try to find by human-readable campaignId
+    if (!campaign) {
+      campaign = await campaigns.findOne({ campaignId: req.params.campaignId });
+    }
+    
     if (campaign) {
       res.status(200).json(campaign);
     } else {
       res.status(404).json({ error: 'Campaign not found' });
     }
   } catch (err) {
+    if (err.message === 'Invalid ObjectId format') {
+      return res.status(400).json({ error: 'Invalid campaign ID format' });
+    }
     console.error('Error querying campaign:', err);
     res.status(500).json({ error: 'Server error' });
   }
@@ -1053,96 +1335,133 @@ app.delete('/api/campaigns/:campaignId', async (req, res) => {
       return res.status(404).json({ error: 'Campaign not found' });
     }
     
-    // Delete associated images from GridFS
-    console.log('=== CHECKING CAMPAIGN IMAGES ===');
-    console.log('campaign.images:', campaign.images);
-    console.log('campaign.images type:', typeof campaign.images);
-    console.log('campaign.images isArray:', Array.isArray(campaign.images));
-    
-    // Handle both array and string formats
+    // Delete associated images from GridFS (wrap in try-catch to ensure campaign deletion happens even if image deletion fails)
+    // Initialize counters in outer scope so they're accessible in the response
+    let deletedCount = 0;
+    let errorCount = 0;
     let imagesToDelete = [];
-    if (campaign.images) {
-      if (Array.isArray(campaign.images)) {
-        imagesToDelete = campaign.images.filter(img => img && img.trim() !== '');
-      } else if (typeof campaign.images === 'string' && campaign.images.trim() !== '') {
-        imagesToDelete = [campaign.images.trim()];
-      }
-    }
     
-    if (imagesToDelete.length > 0) {
-      console.log(`=== DELETING CAMPAIGN IMAGES ===`);
-      console.log(`Found ${imagesToDelete.length} image(s) to delete`);
-      console.log('Image paths:', imagesToDelete);
+    try {
+      console.log('=== CHECKING CAMPAIGN IMAGES ===');
+      console.log('campaign.images:', campaign.images);
+      console.log('campaign.images type:', typeof campaign.images);
+      console.log('campaign.images isArray:', Array.isArray(campaign.images));
       
-      // Check if gridFSBucket is initialized
-      if (!gridFSBucket) {
-        console.error('⚠ gridFSBucket is not initialized! Cannot delete images.');
-      } else {
-        let deletedCount = 0;
-        let errorCount = 0;
+      // Handle both array and string formats
+      if (campaign.images) {
+        if (Array.isArray(campaign.images)) {
+          imagesToDelete = campaign.images.filter(img => img && img.trim() !== '');
+        } else if (typeof campaign.images === 'string' && campaign.images.trim() !== '') {
+          imagesToDelete = [campaign.images.trim()];
+        }
+      }
+      
+      if (imagesToDelete.length > 0) {
+        console.log(`=== DELETING CAMPAIGN IMAGES ===`);
+        console.log(`Found ${imagesToDelete.length} image(s) to delete`);
+        console.log('Image paths:', imagesToDelete);
         
-        for (const imagePath of imagesToDelete) {
-          try {
-            console.log(`Processing image: ${imagePath}`);
-            // Extract filename from path (e.g., /api/images/campaign-123.jpg -> campaign-123.jpg)
-            const filename = imagePath.replace('/api/images/', '').trim();
-            console.log(`Extracted filename: ${filename}`);
-            
-            if (filename) {
-              // Find the file in GridFS
-              const filesCollection = db.collection('images.files');
-              const file = await filesCollection.findOne({ filename: filename });
+        // Check if gridFSBucket is initialized
+        if (!gridFSBucket) {
+          console.error('⚠ gridFSBucket is not initialized! Cannot delete images.');
+        } else {
+          for (const imagePath of imagesToDelete) {
+            try {
+              console.log(`Processing image: ${imagePath}`);
               
-              if (file) {
-                console.log(`Found file in GridFS with _id: ${file._id}`);
-                await gridFSBucket.delete(file._id);
-                deletedCount++;
-                console.log(`✓ Deleted image from GridFS: ${filename}`);
-              } else {
-                console.log(`⚠ Image not found in GridFS: ${filename} (may have been deleted already)`);
-                // Try to find by partial match (in case path format is different)
-                const allFiles = await filesCollection.find({}).toArray();
-                const matchingFile = allFiles.find(f => f.filename.includes(filename) || filename.includes(f.filename));
-                if (matchingFile) {
-                  console.log(`Found matching file: ${matchingFile.filename}, deleting...`);
-                  await gridFSBucket.delete(matchingFile._id);
-                  deletedCount++;
-                  console.log(`✓ Deleted matching image from GridFS: ${matchingFile.filename}`);
+              // Robust filename extraction - handle multiple path formats
+              let filename = '';
+              if (typeof imagePath === 'string') {
+                // If it's already just a filename (no path separators)
+                if (!imagePath.includes('/') && !imagePath.includes('\\')) {
+                  filename = imagePath.trim();
+                } else {
+                  // Extract filename from various path formats:
+                  // - /api/images/filename.jpg
+                  // - api/images/filename.jpg
+                  // - /uploads/filename.jpg
+                  // - C:\path\to\filename.jpg
+                  // - https://example.com/path/filename.jpg
+                  const pathParts = imagePath.split(/[/\\]/);
+                  filename = pathParts[pathParts.length - 1].trim();
+                  
+                  // If it still contains the prefix, try to remove it
+                  if (filename.startsWith('api/images/')) {
+                    filename = filename.replace('api/images/', '');
+                  }
                 }
               }
-            } else {
-              console.log(`⚠ Could not extract filename from path: ${imagePath}`);
+              
+              console.log(`Extracted filename: ${filename}`);
+              
+              if (filename) {
+                // Find the file in GridFS
+                const filesCollection = db.collection('images.files');
+                const file = await filesCollection.findOne({ filename: filename });
+                
+                if (file) {
+                  console.log(`Found file in GridFS with _id: ${file._id}`);
+                  await gridFSBucket.delete(file._id);
+                  deletedCount++;
+                  console.log(`✓ Deleted image from GridFS: ${filename}`);
+                } else {
+                  console.log(`⚠ Image not found in GridFS: ${filename} (may have been deleted already)`);
+                  // Try to find by partial match (in case path format is different)
+                  const allFiles = await filesCollection.find({}).toArray();
+                  const matchingFile = allFiles.find(f => f.filename.includes(filename) || filename.includes(f.filename));
+                  if (matchingFile) {
+                    console.log(`Found matching file: ${matchingFile.filename}, deleting...`);
+                    await gridFSBucket.delete(matchingFile._id);
+                    deletedCount++;
+                    console.log(`✓ Deleted matching image from GridFS: ${matchingFile.filename}`);
+                  }
+                }
+              } else {
+                console.log(`⚠ Could not extract filename from path: ${imagePath}`);
+              }
+            } catch (deleteError) {
+              errorCount++;
+              console.error(`✗ Error deleting image ${imagePath}:`, deleteError);
+              console.error('Error stack:', deleteError.stack);
+              // Continue with other images even if one fails
             }
-          } catch (deleteError) {
-            errorCount++;
-            console.error(`✗ Error deleting image ${imagePath}:`, deleteError);
-            console.error('Error stack:', deleteError.stack);
-            // Continue with other images even if one fails
           }
+          
+          console.log(`=== IMAGE DELETION SUMMARY ===`);
+          console.log(`Total images processed: ${imagesToDelete.length}`);
+          console.log(`Successfully deleted: ${deletedCount}`);
+          console.log(`Errors: ${errorCount}`);
         }
-        
-        console.log(`=== IMAGE DELETION SUMMARY ===`);
-        console.log(`Total images processed: ${imagesToDelete.length}`);
-        console.log(`Successfully deleted: ${deletedCount}`);
-        console.log(`Errors: ${errorCount}`);
+      } else {
+        console.log('No images found in campaign, skipping image deletion');
+        console.log('campaign.images value:', campaign.images);
       }
-    } else {
-      console.log('No images found in campaign, skipping image deletion');
-      console.log('campaign.images value:', campaign.images);
+    } catch (imageError) {
+      // Log image deletion errors but don't stop campaign deletion
+      console.error('Error during image deletion (continuing with campaign deletion):', imageError);
+      console.error('Image error stack:', imageError.stack);
     }
     
-    // Delete the campaign document
+    // Delete the campaign document (this should ALWAYS happen, even if image deletion fails)
+    console.log(`=== DELETING CAMPAIGN DOCUMENT ===`);
+    console.log(`Attempting to delete campaign with _id: ${objectId}`);
     const result = await campaigns.deleteOne({ _id: objectId });
+    
+    console.log(`Delete result: matchedCount=${result.matchedCount}, deletedCount=${result.deletedCount}`);
     
     if (result.deletedCount === 1) {
       console.log(`✓ Campaign deleted successfully: ${campaignId}`);
       res.status(200).json({ 
         message: 'Campaign deleted successfully',
-        imagesDeleted: campaign.images ? campaign.images.length : 0
+        imagesDeleted: deletedCount,  // Use actual count of successfully deleted images
+        imagesProcessed: imagesToDelete.length,  // Total images that were attempted
+        imageErrors: errorCount  // Number of images that failed to delete
       });
     } else {
-      console.log(`Campaign not found for deletion: ${campaignId}`);
-      res.status(404).json({ error: 'Campaign not found' });
+      console.log(`✗ Campaign deletion failed: ${campaignId}`);
+      console.log(`  - matchedCount: ${result.matchedCount}`);
+      console.log(`  - deletedCount: ${result.deletedCount}`);
+      res.status(404).json({ error: 'Campaign not found or could not be deleted' });
     }
   } catch (err) {
     console.error('Error deleting campaign:', err);
@@ -1194,13 +1513,17 @@ app.put('/api/campaigns/impressions/:tagNumber', async (req, res) => {
 
 // PUT: Update marketing achieved impressions and conversions
 app.put('/api/campaigns/:campaignId/achieved', async (req, res) => {
-  const campaignId = req.params.campaignId;
   const { impressions, conversions } = req.body;
   
-  console.log(`Updating marketing achieved for campaign ${campaignId}: impressions=${impressions}, conversions=${conversions}`);
+  console.log(`Updating marketing achieved for campaign ${req.params.campaignId}: impressions=${impressions}, conversions=${conversions}`);
   
   try {
-    const campaigns = db.collection('campaigns');
+    // Find campaign by ObjectId
+    const campaign = await findCampaignByObjectId(req.params.campaignId);
+    
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
     
     // Validate impressions is a number
     if (typeof impressions !== 'number' || impressions < 0) {
@@ -1212,9 +1535,11 @@ app.put('/api/campaigns/:campaignId/achieved', async (req, res) => {
       return res.status(400).json({ error: 'Conversions must be a positive number' });
     }
     
-    // Update the campaign's achieved impressions and conversions
+    const campaigns = db.collection('campaigns');
+    
+    // Update the campaign's achieved impressions and conversions using _id
     const result = await campaigns.updateOne(
-      { campaignId },
+      { _id: campaign._id },
       { $set: { 
         'achieved.impressions': impressions,
         'achieved.conversions': conversions
@@ -1233,6 +1558,9 @@ app.put('/api/campaigns/:campaignId/achieved', async (req, res) => {
       conversions: conversions
     });
   } catch (err) {
+    if (err.message === 'Invalid ObjectId format') {
+      return res.status(400).json({ error: 'Invalid campaign ID format' });
+    }
     console.error('Error updating marketing achieved:', err);
     res.status(500).json({ error: 'Server error' });
   }
@@ -1240,23 +1568,29 @@ app.put('/api/campaigns/:campaignId/achieved', async (req, res) => {
 
 // PUT: Update impressions for a specific platform in a campaign (fallback for channel index)
 app.put('/api/campaigns/:campaignId/channels/:channelIndex/impressions', async (req, res) => {
-  const campaignId = req.params.campaignId;
   const channelIndex = parseInt(req.params.channelIndex);
   const { impressions } = req.body;
   
-  console.log(`Updating impressions for campaign ${campaignId}, channel ${channelIndex} to ${impressions}`);
+  console.log(`Updating impressions for campaign ${req.params.campaignId}, channel ${channelIndex} to ${impressions}`);
   
   try {
-    const campaigns = db.collection('campaigns');
+    // Find campaign by ObjectId
+    const campaign = await findCampaignByObjectId(req.params.campaignId);
+    
+    if (!campaign) {
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
     
     // Validate impressions is a number
     if (typeof impressions !== 'number' || impressions < 0) {
       return res.status(400).json({ error: 'Impressions must be a positive number' });
     }
     
-    // Update the specific channel's impressions
+    const campaigns = db.collection('campaigns');
+    
+    // Update the specific channel's impressions using _id
     const result = await campaigns.updateOne(
-      { campaignId },
+      { _id: campaign._id },
       { $set: { [`channels.${channelIndex}.impressions`]: impressions } }
     );
     
@@ -1275,6 +1609,9 @@ app.put('/api/campaigns/:campaignId/channels/:channelIndex/impressions', async (
       impressions: impressions
     });
   } catch (err) {
+    if (err.message === 'Invalid ObjectId format') {
+      return res.status(400).json({ error: 'Invalid campaign ID format' });
+    }
     console.error('Error updating impressions:', err);
     res.status(500).json({ error: 'Server error' });
   }
@@ -1386,9 +1723,17 @@ app.post('/api/tags/generate', async (req, res) => {
     return res.status(400).json({ error: 'Please select a channel type' });
   }
   
+  // Check if database is initialized
+  if (!db) {
+    console.error('Database not initialized');
+    return res.status(500).json({ error: 'Database connection not available' });
+  }
+  
+  // Declare prefix outside try block so it's accessible in catch block
+  let prefix = '';
+  
   try {
     // Determine prefix based on channel type and platform
-    let prefix = '';
     if (trimmedChannelType === 'Instagram') {
       prefix = 'IG';
     } else if (trimmedChannelType === 'Facebook') {
@@ -1460,66 +1805,92 @@ app.post('/api/tags/generate', async (req, res) => {
     }
     
     const tagCounters = db.collection('tagCounters');
-    
-    // Get current counter (represents last saved tag number)
-    let counter = await tagCounters.findOne({ prefix: prefix });
-    
-    if (!counter) {
-      // If counter doesn't exist, create it with lastNumber: 0
-      await tagCounters.insertOne({ prefix: prefix, lastNumber: 0 });
-      counter = { prefix: prefix, lastNumber: 0 };
-    }
-    
-    // Generate next tag number (last saved + 1)
-    const nextNumber = counter.lastNumber + 1;
-    const newTagNumber = `${prefix}${String(nextNumber).padStart(5, '0')}`;
-    
-    // Check if this tag number already exists in any campaign
     const campaigns = db.collection('campaigns');
-    const existingTag = await campaigns.findOne({
-      'channels.tagNumber': newTagNumber
-    });
     
-    if (existingTag) {
-      // If tag exists, increment counter and try again
-      const incrementedNumber = nextNumber + 1;
-      const incrementedTagNumber = `${prefix}${String(incrementedNumber).padStart(5, '0')}`;
+    // ATOMIC: Use findOneAndUpdate with $inc to atomically allocate counter
+    // This prevents race conditions where multiple requests get the same counter value
+    const maxRetries = 10;
+    let attempts = 0;
+    
+    while (attempts < maxRetries) {
+      attempts++;
       
-      console.log(`Tag ${newTagNumber} already exists, generating ${incrementedTagNumber} instead`);
-      
-      // Update counter to the incremented number
-      await tagCounters.updateOne(
+      // ATOMIC: Increment counter and get the new value in one operation
+      // This ensures only one request gets each number, preventing duplicates
+      const result = await tagCounters.findOneAndUpdate(
         { prefix: prefix },
-        { $set: { lastNumber: incrementedNumber } },
-        { upsert: true }
+        { 
+          $inc: { lastNumber: 1 },
+          $setOnInsert: { prefix: prefix } // Only set prefix if document doesn't exist (don't set lastNumber here to avoid conflict)
+        },
+        { 
+          upsert: true,
+          returnDocument: 'after' // Return the document after update
+        }
       );
       
-      res.json({
-        tagNumber: incrementedTagNumber,
-        prefix: prefix,
-        counter: incrementedNumber,
-        shouldIncrement: true
-      });
-    } else {
-      // Immediately increment the counter to prevent duplicate tags
-      await tagCounters.updateOne(
-        { prefix: prefix },
-        { $set: { lastNumber: nextNumber } },
-        { upsert: true }
-      );
+      // Handle different MongoDB driver versions (like getNextCampaignId does)
+      let allocatedNumber;
+      if (result && result.value) {
+        // Older MongoDB driver format
+        allocatedNumber = result.value.lastNumber;
+        console.log('Using result.value.lastNumber:', allocatedNumber);
+      } else if (result && result.lastNumber !== undefined) {
+        // Newer MongoDB driver format
+        allocatedNumber = result.lastNumber;
+        console.log('Using result.lastNumber:', allocatedNumber);
+      } else {
+        // Fallback: result is null or invalid
+        console.error(`findOneAndUpdate returned null or invalid result for prefix ${prefix} (attempt ${attempts})`);
+        if (attempts < maxRetries) {
+          // Retry
+          continue;
+        } else {
+          throw new Error(`Failed to generate tag: Database operation returned invalid result for prefix ${prefix} after ${maxRetries} attempts`);
+        }
+      }
       
-      console.log(`Generated unique tag: ${newTagNumber} for ${channelType}${platform ? ' - ' + platform : ''}`);
+      const newTagNumber = `${prefix}${String(allocatedNumber).padStart(5, '0')}`;
       
-      res.json({
-        tagNumber: newTagNumber,
-        prefix: prefix,
-        counter: nextNumber,
-        shouldIncrement: true
+      // Defense in depth: Check if this tag already exists (shouldn't happen with atomic increment)
+      const existingTag = await campaigns.findOne({
+        'channels.tagNumber': newTagNumber
       });
+      
+      if (!existingTag) {
+        // Tag is available, return it
+        console.log(`Generated unique tag: ${newTagNumber} for ${channelType}${platform ? ' - ' + platform : ''}`);
+        return res.json({
+          tagNumber: newTagNumber,
+          prefix: prefix,
+          counter: allocatedNumber,
+          shouldIncrement: true
+        });
+      } else {
+        // Tag exists (shouldn't happen with atomic increment, but handle it)
+        console.warn(`Tag ${newTagNumber} already exists, retrying with next number... (attempt ${attempts})`);
+        // Loop will retry with next incremented number
+      }
     }
+    
+    // If we exhausted retries
+    console.error(`Failed to generate unique tag after ${maxRetries} attempts for prefix ${prefix}`);
+    return res.status(500).json({ 
+      error: 'Failed to generate unique tag after multiple attempts. Please try again.' 
+    });
   } catch (err) {
     console.error('Error generating tag:', err);
-    res.status(500).json({ error: 'Server error' });
+    console.error('Error details:', {
+      message: err.message,
+      stack: err.stack,
+      channelType: trimmedChannelType,
+      platform: platform,
+      prefix: prefix || 'unknown'
+    });
+    res.status(500).json({ 
+      error: 'Server error',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   }
 });
 
@@ -1676,11 +2047,11 @@ app.use('/uploads', express.static('uploads'));
 // POST: Create a new channel
 app.post('/api/channels', async (req, res) => {
   try {
-    const { channel_type, channel_tag, add_tag, Mobile_no, Tot_conversions, Tot_impressions, Company_name } = req.body;
+    const { channelType, channelTag, addTag, mobileNo, totConversions, totImpressions, companyName } = req.body;
     
     // Validate required fields
-    if (!channel_type) {
-      return res.status(400).json({ error: 'channel_type is required' });
+    if (!channelType) {
+      return res.status(400).json({ error: 'channelType is required' });
     }
     
     // Generate unique channel_id
@@ -1688,13 +2059,13 @@ app.post('/api/channels', async (req, res) => {
     
     const channel = {
       channel_id,
-      channel_type,
-      channel_tag: channel_tag || '',
-      add_tag: add_tag || '',
-      Mobile_no: Mobile_no || '',
-      Tot_conversions: Tot_conversions || 0,
-      Tot_impressions: Tot_impressions || 0,
-      Company_name: Company_name || '',
+      channelType,
+      channelTag: channelTag || '',
+      addTag: addTag || '',
+      mobileNo: mobileNo || '',
+      totConversions: totConversions || 0,
+      totImpressions: totImpressions || 0,
+      companyName: companyName || '',
       createdAt: new Date(),
       updatedAt: new Date()
     };
@@ -1727,7 +2098,7 @@ app.get('/api/channels', async (req, res) => {
 });
 
 // GET: Get all unique channel tags (MUST be before /api/channels/:id route)
-// Optional query parameter: channel_type - filters tags by channel type
+// Optional query parameter: channelType - filters tags by channel type
 app.get('/api/channels/tags', async (req, res) => {
   try {
     if (!db) {
@@ -1735,12 +2106,12 @@ app.get('/api/channels/tags', async (req, res) => {
     }
     
     const channels = db.collection('channels');
-    const { channel_type } = req.query;
+    const { channelType } = req.query;
     
     // Build query filter
     const query = {};
-    if (channel_type && channel_type.trim() !== '') {
-      query.channel_type = channel_type.trim();
+    if (channelType && channelType.trim() !== '') {
+      query.channelType = channelType.trim();
     }
     
     const allChannels = await channels.find(query).toArray();
@@ -1748,7 +2119,7 @@ app.get('/api/channels/tags', async (req, res) => {
     // Extract unique channel tags (filter out empty/null values)
     const uniqueTags = [...new Set(
       allChannels
-        .map(channel => channel.channel_tag)
+        .map(channel => channel.channelTag)
         .filter(tag => tag && tag.trim() !== '')
     )].sort();
     
@@ -1772,13 +2143,13 @@ app.get('/api/channels/export', async (req, res) => {
     
     worksheet.columns = [
       { header: 'Channel ID', key: 'channel_id', width: 15 },
-      { header: 'Channel Type', key: 'channel_type', width: 20 },
-      { header: 'Channel Tag', key: 'channel_tag', width: 20 },
-      { header: 'Add Tag', key: 'add_tag', width: 20 },
-      { header: 'Mobile No', key: 'Mobile_no', width: 15 },
-      { header: 'Company Name', key: 'Company_name', width: 25 },
-      { header: 'Total Impressions', key: 'Tot_impressions', width: 15 },
-      { header: 'Total Conversions', key: 'Tot_conversions', width: 15 },
+      { header: 'Channel Type', key: 'channelType', width: 20 },
+      { header: 'Channel Tag', key: 'channelTag', width: 20 },
+      { header: 'Add Tag', key: 'addTag', width: 20 },
+      { header: 'Mobile No', key: 'mobileNo', width: 15 },
+      { header: 'Company Name', key: 'companyName', width: 25 },
+      { header: 'Total Impressions', key: 'totImpressions', width: 15 },
+      { header: 'Total Conversions', key: 'totConversions', width: 15 },
       { header: 'Created At', key: 'createdAt', width: 20 },
       { header: 'Updated At', key: 'updatedAt', width: 20 },
     ];
@@ -1788,13 +2159,13 @@ app.get('/api/channels/export', async (req, res) => {
       // Add a message row to indicate no data
       worksheet.addRow({
         channel_id: 'No channels found',
-        channel_type: '',
-        channel_tag: '',
-        add_tag: '',
-        Mobile_no: '',
-        Company_name: '',
-        Tot_impressions: '',
-        Tot_conversions: '',
+        channelType: '',
+        channelTag: '',
+        addTag: '',
+        mobileNo: '',
+        companyName: '',
+        totImpressions: '',
+        totConversions: '',
         createdAt: '',
         updatedAt: ''
       });
@@ -1802,13 +2173,13 @@ app.get('/api/channels/export', async (req, res) => {
       data.forEach(channel => {
         worksheet.addRow({
           channel_id: channel.channel_id || '',
-          channel_type: channel.channel_type || '',
-          channel_tag: channel.channel_tag || '',
-          add_tag: channel.add_tag || '',
-          Mobile_no: channel.Mobile_no || '',
-          Company_name: channel.Company_name || '',
-          Tot_impressions: channel.Tot_impressions || 0,
-          Tot_conversions: channel.Tot_conversions || 0,
+          channelType: channel.channelType || '',
+          channelTag: channel.channelTag || '',
+          addTag: channel.addTag || '',
+          mobileNo: channel.mobileNo || '',
+          companyName: channel.companyName || '',
+          totImpressions: channel.totImpressions || 0,
+          totConversions: channel.totConversions || 0,
           createdAt: channel.createdAt ? new Date(channel.createdAt).toLocaleString() : '',
           updatedAt: channel.updatedAt ? new Date(channel.updatedAt).toLocaleString() : '',
         });
@@ -2040,7 +2411,7 @@ app.get('/api/channels/:id', async (req, res) => {
 app.put('/api/channels/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { channel_type, channel_tag, add_tag, Mobile_no, Tot_conversions, Tot_impressions, Company_name } = req.body;
+    const { channelType, channelTag, addTag, mobileNo, totConversions, totImpressions, companyName } = req.body;
     
     const channels = db.collection('channels');
     
@@ -2049,13 +2420,13 @@ app.put('/api/channels/:id', async (req, res) => {
       updatedAt: new Date()
     };
     
-    if (channel_type !== undefined) updateData.channel_type = channel_type;
-    if (channel_tag !== undefined) updateData.channel_tag = channel_tag;
-    if (add_tag !== undefined) updateData.add_tag = add_tag;
-    if (Mobile_no !== undefined) updateData.Mobile_no = Mobile_no;
-    if (Tot_conversions !== undefined) updateData.Tot_conversions = Tot_conversions;
-    if (Tot_impressions !== undefined) updateData.Tot_impressions = Tot_impressions;
-    if (Company_name !== undefined) updateData.Company_name = Company_name;
+    if (channelType !== undefined) updateData.channelType = channelType;
+    if (channelTag !== undefined) updateData.channelTag = channelTag;
+    if (addTag !== undefined) updateData.addTag = addTag;
+    if (mobileNo !== undefined) updateData.mobileNo = mobileNo;
+    if (totConversions !== undefined) updateData.totConversions = totConversions;
+    if (totImpressions !== undefined) updateData.totImpressions = totImpressions;
+    if (companyName !== undefined) updateData.companyName = companyName;
     
     // Try to find by channel_id first, then by _id
     let query = { channel_id: id };
@@ -2095,7 +2466,7 @@ app.put('/api/channels/:id', async (req, res) => {
 // POST: Bulk update channels with impressions and conversions from priority channels calculation
 app.post('/api/channels/bulk-update-totals', async (req, res) => {
   try {
-    const { updates } = req.body; // Array of { channel_id, Tot_impressions, Tot_conversions }
+    const { updates } = req.body; // Array of { channel_id, totImpressions, totConversions }
     
     console.log('Bulk update request received:', { updatesCount: updates?.length || 0 });
     
@@ -2109,7 +2480,7 @@ app.post('/api/channels/bulk-update-totals', async (req, res) => {
     const errors = [];
     
     for (const update of updates) {
-      const { channel_id, Tot_impressions, Tot_conversions } = update;
+      const { channel_id, totImpressions, totConversions } = update;
       
       if (!channel_id) {
         errors.push({ channel_id: 'missing', error: 'channel_id is required' });
@@ -2117,14 +2488,14 @@ app.post('/api/channels/bulk-update-totals', async (req, res) => {
       }
       
       try {
-        console.log(`Updating channel ${channel_id}: impressions=${Tot_impressions}, conversions=${Tot_conversions}`);
+        console.log(`Updating channel ${channel_id}: impressions=${totImpressions}, conversions=${totConversions}`);
         
         const result = await channels.updateOne(
           { channel_id: channel_id },
           { 
             $set: { 
-              Tot_impressions: Tot_impressions || 0,
-              Tot_conversions: Tot_conversions || 0,
+              totImpressions: totImpressions || 0,
+              totConversions: totConversions || 0,
               updatedAt: new Date()
             } 
           }
@@ -2203,8 +2574,66 @@ app.delete('/api/channels/:id', async (req, res) => {
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Error:', err);
+  
+  // Handle multer errors
+  if (err instanceof multer.MulterError) {
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(400).json({ 
+        error: 'File too large', 
+        details: 'Maximum file size is 5MB per file.' 
+      });
+    }
+    if (err.code === 'LIMIT_FILE_COUNT') {
+      return res.status(400).json({ 
+        error: 'Too many files', 
+        details: 'Maximum 10 files allowed per request.' 
+      });
+    }
+    if (err.code === 'LIMIT_FIELD_COUNT') {
+      return res.status(400).json({ 
+        error: 'Too many fields', 
+        details: 'Request contains too many fields.' 
+      });
+    }
+    if (err.code === 'LIMIT_PART_COUNT') {
+      return res.status(400).json({ 
+        error: 'Too many parts', 
+        details: 'Request contains too many parts.' 
+      });
+    }
+    return res.status(400).json({ 
+      error: 'Upload error', 
+      details: err.message 
+    });
+  }
+  
+  // Handle file filter errors
+  if (err.message && (
+    err.message.includes('Invalid file type') ||
+    err.message.includes('Invalid file extension') ||
+    err.message.includes('Invalid filename') ||
+    err.message.includes('Only image files')
+  )) {
+    return res.status(400).json({ 
+      error: 'File validation failed', 
+      details: err.message 
+    });
+  }
+  
+  // Handle rate limit errors
+  if (err.status === 429) {
+    return res.status(429).json({ 
+      error: 'Too many requests', 
+      details: err.message || 'Please try again later.' 
+    });
+  }
+  
+  // Generic error handling
   if (req.path.startsWith('/api/')) {
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ 
+      error: 'Server error',
+      details: process.env.NODE_ENV === 'development' ? err.message : undefined
+    });
   } else {
     res.status(500).send('Server error');
   }
@@ -2263,6 +2692,19 @@ async function setupDatabase() {
       await new Promise(resolve => setTimeout(resolve, 2000));
     }
   }
+}
+
+// Helper function to find campaign by ObjectId (standardized identifier)
+async function findCampaignByObjectId(objectIdString) {
+  const campaigns = db.collection('campaigns');
+  
+  // Validate ObjectId format
+  if (!ObjectId.isValid(objectIdString)) {
+    throw new Error('Invalid ObjectId format');
+  }
+  
+  const objectId = new ObjectId(objectIdString);
+  return await campaigns.findOne({ _id: objectId });
 }
 
 // Generate Marketing ID using a persistent counter (6-digit format: MK_000001, MK_000002, etc.)

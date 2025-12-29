@@ -1354,30 +1354,16 @@
                   method: 'DELETE',
                   headers: { 'Content-Type': 'application/json' }
                 });
+                const result = await response.json();
+                
                 if (response.ok) {
-                  originalCampaigns = originalCampaigns.filter(c => c._id !== campaign._id);
+                  // Success - reload table
+                  await loadCampaignsTable();
                   
                   // Clear any radio selection
                   const selectedRadio = document.querySelector('input[name="selected_campaign"]:checked');
                   if (selectedRadio) {
                     selectedRadio.checked = false;
-                  }
-                  
-                  // Force table refresh with empty state handling
-                  if (originalCampaigns.length === 0) {
-                    const tableBody = document.getElementById('campaigns-table-body');
-                    if (tableBody) {
-                      tableBody.innerHTML = '<tr><td colspan="21" class="text-center text-gray-500 py-4">No campaigns found</td></tr>';
-                    }
-                  }
-                  
-                  // Refresh the table
-                  displayCampaignsTable(originalCampaigns);
-                  
-                  // Update campaigns count
-                  const campaignsCount = document.getElementById('campaigns-count');
-                  if (campaignsCount) {
-                    campaignsCount.textContent = originalCampaigns.length;
                   }
                   
                   // Clear the input field for next deletion
@@ -1386,14 +1372,18 @@
                   // Keep result message hidden (no need to show success message below input)
                   resultMsg.classList.add('hidden');
                   
-                  console.log('Campaign deleted, campaigns remaining:', originalCampaigns.length);
+                  console.log('Campaign deleted successfully, table reloaded from server');
                   alert('Campaign deleted successfully!');
                 } else {
-                  const error = await response.json();
-                  resultMsg.textContent = `Failed to delete campaign: ${error.error || 'Unknown error'}`;
+                  // Deletion failed - but still reload table to show current state
+                  console.error('Campaign deletion failed:', result.error);
+                  resultMsg.textContent = `Failed to delete campaign: ${result.error || 'Unknown error'}`;
                   resultMsg.className = 'text-red-700 mt-4';
                   resultMsg.classList.remove('hidden');
-                  alert(`Failed to delete campaign: ${error.error || 'Unknown error'}`);
+                  alert(`Failed to delete campaign: ${result.error || 'Unknown error'}`);
+                  
+                  // IMPORTANT: Reload table even on failure to sync with database
+                  await loadCampaignsTable();
                 }
               } catch (error) {
                 resultMsg.textContent = 'Failed to delete campaign. Please try again.';
@@ -3124,10 +3114,10 @@
     // channelType: optional - if provided, filters tags by channel type
     window.populateChannelTagList = async function populateChannelTagList(channelType = null, entryElement = null) {
       try {
-        // Build URL with optional channel_type query parameter
+        // Build URL with optional channelType query parameter
         let url = '/api/channels/tags';
         if (channelType && channelType.trim() !== '') {
-          url += `?channel_type=${encodeURIComponent(channelType.trim())}`;
+          url += `?channelType=${encodeURIComponent(channelType.trim())}`;
         }
         
         const response = await fetch(url);
@@ -3259,13 +3249,45 @@
       }
     }
 
+    // Flags to prevent multiple simultaneous submissions
+    let submitInProgress = false;
+    let updateInProgress = false;
+
     async function submitCampaign() {
+      // Early return if already in progress
+      if (submitInProgress) {
+        console.log('Submit already in progress, ignoring duplicate click');
+        return;
+      }
+      
       console.log('Submit button clicked - starting validation...');
+      
+      // Get submit button and disable it immediately
+      const submitBtn = document.querySelector('button[onclick="submitCampaign()"]');
+      const originalText = submitBtn ? submitBtn.textContent : 'Create New';
+      
+      // Disable button and show loading state
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating...';
+      }
+      submitInProgress = true;
+      
+      // Create AbortController for timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
       
       // Validate Status (mandatory)
       const status = document.getElementById('status').value;
       if (!status || status.trim() === '') {
         alert('⚠️ Warning: Status is mandatory. Please select a status for this campaign.');
+        // Re-enable button before returning
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+        clearTimeout(timeoutId);
+        submitInProgress = false;
         return;
       }
       
@@ -3273,6 +3295,13 @@
       const gender = document.getElementById('targetGender').value;
       if (!gender || gender.trim() === '') {
         alert('⚠️ Warning: Gender is mandatory. Please select a gender for this campaign.');
+        // Re-enable button before returning
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+        clearTimeout(timeoutId);
+        submitInProgress = false;
         return;
       }
       
@@ -3280,6 +3309,13 @@
       const workStartDate = document.getElementById('workStartDate').value;
       if (status === 'Planned' && (!workStartDate || workStartDate.trim() === '')) {
         alert('⚠️ Warning: Work Start Date is mandatory when status is "Planned". Please select a date when the team started working on this campaign.');
+        // Re-enable button before returning
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+        clearTimeout(timeoutId);
+        submitInProgress = false;
         return;
       }
       
@@ -3295,6 +3331,13 @@
           const adType = entry.querySelector('.channelAdType')?.value;
           if (!adType || adType.trim() === '') {
             alert(`⚠️ Warning: Please select a Type for ${type}. Type selection is mandatory.`);
+            // Re-enable button before returning
+            if (submitBtn) {
+              submitBtn.disabled = false;
+              submitBtn.textContent = originalText;
+            }
+            clearTimeout(timeoutId);
+            submitInProgress = false;
             return;
           }
         }
@@ -3603,7 +3646,10 @@
         const response = await fetch('/api/campaigns', {
           method: 'POST',
           body: formData, // Don't set Content-Type header, let browser set it for FormData
+          signal: controller.signal // Add abort signal for timeout
         });
+        
+        clearTimeout(timeoutId);
         
         console.log('=== SERVER RESPONSE ===');
         console.log('Status:', response.status);
@@ -3618,13 +3664,32 @@
           console.log('✓ Campaign created successfully with ID:', result.campaignId);
           alert(result.message);
           clearForm();
+          
+          // Refresh campaigns table to include the new campaign
+          await loadCampaignsTable();
+          
+          // Don't force navigation - let user stay where they are or navigate manually
         } else {
           console.error('✗ Server error:', result.error);
           alert('Error: ' + result.error);
         }
       } catch (err) {
-        console.error('✗ Request failed:', err);
+        clearTimeout(timeoutId);
+        
+        if (err.name === 'AbortError') {
+          console.error('✗ Request timed out');
+          alert('Request timed out. Please check your connection and try again.');
+        } else {
+          console.error('✗ Request failed:', err);
         alert('Error: ' + err.message);
+        }
+      } finally {
+        // Re-enable button and restore text
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+        submitInProgress = false;
       }
     }
 
@@ -4641,6 +4706,8 @@
       if (submitButton) {
          submitButton.onclick = () => submitCampaignUpdate();
          submitButton.textContent = 'Update Marketing record';
+         // Store reference for submitCampaignUpdate to find it
+         submitButton.setAttribute('data-submit-type', 'update');
       }
       
       // Show the form
@@ -4742,9 +4809,36 @@
     }
 
     async function submitCampaignUpdate() {
-      try {
+      // Early return if already in progress
+      if (updateInProgress) {
+        console.log('Update already in progress, ignoring duplicate click');
+        return;
+      }
+      
         // Get the edit form
         const editForm = document.getElementById('editCampaignForm');
+      
+      // Get submit button and disable it immediately
+      const submitBtn = editForm?.querySelector('button[data-submit-type="update"]') || 
+                        editForm?.querySelector('button[onclick*="submitCampaignUpdate"]') ||
+                        document.querySelector('button[data-submit-type="update"]');
+      const originalText = submitBtn ? submitBtn.textContent : 'Update Marketing record';
+      
+      // Disable button and show loading state
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Updating...';
+      }
+      updateInProgress = true;
+      
+      // Create AbortController for timeout handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      
+      try {
+        if (!editForm) {
+          throw new Error('Edit form not found');
+        }
         
         // Validate category selection
         const editCategorySelects = editForm.querySelectorAll('.targetCategory');
@@ -4752,6 +4846,12 @@
         const allCategoriesSelected = Array.from(editCategorySelects).every(select => select.value && select.value.trim() !== '');
         if (!allCategoriesSelected) {
           alert('⚠️ Warning: Please select a category for every row before updating the campaign.');
+          // Re-enable button before returning
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+          updateInProgress = false;
           return;
         }
         
@@ -4759,6 +4859,12 @@
         const status = editForm.querySelector('#status')?.value;
         if (!status || status.trim() === '') {
           alert('⚠️ Warning: Status is mandatory. Please select a status for this campaign.');
+          // Re-enable button before returning
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+          updateInProgress = false;
           return;
         }
         
@@ -4766,6 +4872,12 @@
         const gender = editForm.querySelector('#targetGender')?.value;
         if (!gender || gender.trim() === '') {
           alert('⚠️ Warning: Gender is mandatory. Please select a gender for this campaign.');
+          // Re-enable button before returning
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+          updateInProgress = false;
           return;
         }
         
@@ -4773,11 +4885,13 @@
         const workStartDate = editForm.querySelector('#workStartDate')?.value;
         if (status === 'Planned' && (!workStartDate || workStartDate.trim() === '')) {
           alert('⚠️ Warning: Work Start Date is mandatory when status is "Planned". Please select a date when the team started working on this campaign.');
+          // Re-enable button before returning
+          if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+          updateInProgress = false;
           return;
-        }
-        
-        if (!editForm) {
-          throw new Error('Edit form not found');
         }
 
         // Get the MongoDB _id from the hidden input
@@ -5026,18 +5140,43 @@
         // Send update request with FormData
         const response = await fetch(`/api/campaigns/${campaignId}`, {
           method: 'PUT',
-          body: formDataWithFiles // Don't set Content-Type header, let browser set it for FormData
+          body: formDataWithFiles, // Don't set Content-Type header, let browser set it for FormData
+          signal: controller.signal // Add abort signal for timeout
         });
+        
+        clearTimeout(timeoutId);
+        
         const result = await response.json();
         if (response.ok) {
           alert('Campaign updated successfully!');
-          showSection('campaigns-table');
-          // Optionally reload campaigns
+          
+          // Refresh campaigns table to reflect updates
+          await loadCampaignsTable();
+          
+          // Don't force navigation - let user stay where they are or navigate manually
         } else {
-          throw new Error('Server returned an error: ' + JSON.stringify(result));
+          console.error('✗ Server error:', result.error);
+          alert('Error: ' + (result.error || 'Unknown error occurred'));
         }
       } catch (err) {
-        alert('Error: ' + err.message);
+        clearTimeout(timeoutId);
+        
+        if (err.name === 'AbortError') {
+          console.error('✗ Request timed out');
+          alert('Request timed out. Please check your connection and try again.');
+        } else {
+          console.error('✗ Request failed:', err);
+          // Check if error has a message property (from server response)
+          const errorMessage = err.message || err.error || 'An unexpected error occurred';
+          alert('Error: ' + errorMessage);
+        }
+      } finally {
+        // Re-enable button and restore text
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+        updateInProgress = false;
       }
     }
 
@@ -5332,8 +5471,8 @@
             console.log('Set channelTag:', channel.channelTag);
           }
           
-          // Append to container after all configuration is complete
-          channelContainer.appendChild(channelEntry);
+          // NOTE: No need to append here - addChannelEntryInEditForm() already appends the entry
+          // Appending again would cause duplicates and tag number conflicts
           
           // Ensure the entry is visible and properly rendered
           console.log('Channel entry added to container:', channelEntry);
@@ -6544,25 +6683,39 @@
     
     // Function to display campaigns in table
     function displayCampaignsTable(campaigns) {
-      console.log('displayCampaignsTable called with:', campaigns);
+      console.log('[DEBUG] displayCampaignsTable called with:', campaigns);
       const tableBody = document.getElementById('campaigns-table-body');
       const countSpan = document.getElementById('campaigns-count');
       
-      if (!tableBody) return;
+      if (!tableBody) {
+        console.error('[DEBUG] Table body not found');
+        return;
+      }
+      
+      // Ensure campaigns is an array
+      if (!Array.isArray(campaigns)) {
+        console.error('[DEBUG] Campaigns is not an array:', campaigns);
+        campaigns = [];
+      }
       
       // Store original data for filtering
       originalCampaigns = campaigns;
-      console.log('Original campaigns stored:', originalCampaigns.length);
+      console.log('[DEBUG] Original campaigns stored:', originalCampaigns.length);
       
       // Debug: Check which campaigns have images
       const campaignsWithImages = campaigns.filter(c => c.images && (
         (Array.isArray(c.images) && c.images.length > 0) ||
         (typeof c.images === 'string' && c.images.trim() !== '')
       ));
-      console.log('Campaigns with images:', campaignsWithImages.length);
-      campaignsWithImages.forEach(c => {
-        console.log(`Campaign ${c.campaignId} has ${Array.isArray(c.images) ? c.images.length : 1} image(s):`, c.images);
-      });
+      console.log('[DEBUG] Campaigns with images:', campaignsWithImages.length);
+      if (campaignsWithImages.length > 0) {
+        campaignsWithImages.forEach(c => {
+          console.log(`[DEBUG] Campaign ${c.campaignId} has ${Array.isArray(c.images) ? c.images.length : 1} image(s):`, c.images);
+        });
+      }
+      
+      // Refresh channel tag filter list with new data
+      populateFilterChannelTagList();
       
       // Apply filters and display
       applyFilters();
@@ -6573,7 +6726,16 @@
       const tableBody = document.getElementById('campaigns-table-body');
       const countSpan = document.getElementById('campaigns-count');
       
-      if (!tableBody || !originalCampaigns) return;
+      if (!tableBody) {
+        console.error('[DEBUG] Table body not found in applyFilters');
+        return;
+      }
+      
+      // Ensure originalCampaigns is an array (even if empty)
+      if (!Array.isArray(originalCampaigns)) {
+        console.error('[DEBUG] originalCampaigns is not an array:', originalCampaigns);
+        originalCampaigns = [];
+      }
       
       // Get filter values
       const campaignIdFilter = document.getElementById('filter-campaign-id')?.value.toLowerCase() || '';
@@ -6793,51 +6955,75 @@
       }, 100);
     }
     
-    // Function to populate channel tag filter datalist from campaigns
+    // Function to populate channel tag filter datalist from campaigns AND channels collection
     async function populateFilterChannelTagList() {
       try {
-        const response = await fetch('/api/campaigns/channel-tags');
-        if (!response.ok) {
+        // Fetch tags from both campaigns and channels collection
+        const [campaignsResponse, channelsResponse] = await Promise.all([
+          fetch('/api/campaigns/channel-tags'),
+          fetch('/api/channels/tags')
+        ]);
+        
+        // Use Map for case-insensitive deduplication
+        // Key: lowercase tag (for deduplication), Value: original tag (for display)
+        const tagsMap = new Map();
+        
+        // Add tags from campaigns
+        if (campaignsResponse.ok) {
+          const campaignsData = await campaignsResponse.json();
+          if (campaignsData.tags && Array.isArray(campaignsData.tags)) {
+            campaignsData.tags.forEach(tag => {
+              if (tag && tag.trim() !== '') {
+                const trimmedTag = tag.trim();
+                const lowerTag = trimmedTag.toLowerCase();
+                // Only add if we haven't seen this tag (case-insensitive) before
+                if (!tagsMap.has(lowerTag)) {
+                  tagsMap.set(lowerTag, trimmedTag);
+                }
+              }
+            });
+          }
+        } else {
           console.warn('Failed to fetch channel tags from campaigns');
-          return;
         }
         
-        const data = await response.json();
-        const datalist = document.getElementById('filterChannelTagList');
+        // Add tags from channels collection
+        if (channelsResponse.ok) {
+          const channelsData = await channelsResponse.json();
+          if (channelsData.tags && Array.isArray(channelsData.tags)) {
+            channelsData.tags.forEach(tag => {
+              if (tag && tag.trim() !== '') {
+                const trimmedTag = tag.trim();
+                const lowerTag = trimmedTag.toLowerCase();
+                // Only add if we haven't seen this tag (case-insensitive) before
+                if (!tagsMap.has(lowerTag)) {
+                  tagsMap.set(lowerTag, trimmedTag);
+                }
+              }
+            });
+          }
+        } else {
+          console.warn('Failed to fetch channel tags from channels collection');
+        }
         
+        const datalist = document.getElementById('filterChannelTagList');
         if (!datalist) return;
         
         // Clear existing options
         datalist.innerHTML = '';
         
-        // Add options from campaigns
-        if (data.tags && Array.isArray(data.tags)) {
-          data.tags.forEach(tag => {
-            const option = document.createElement('option');
-            option.value = tag;
-            datalist.appendChild(option);
-          });
-        }
+        // Extract values (original tags) and sort them
+        const sortedTags = Array.from(tagsMap.values()).sort();
+        sortedTags.forEach(tag => {
+          const option = document.createElement('option');
+          option.value = tag;
+          datalist.appendChild(option);
+        });
+        
+        console.log(`Populated filter with ${sortedTags.length} unique channel tags (from campaigns and channels collection)`);
       } catch (error) {
         console.warn('Error loading channel tags for filter:', error);
       }
-    }
-    
-    // Override the original displayCampaignsTable function
-    function displayCampaignsTable(campaigns) {
-      const tableBody = document.getElementById('campaigns-table-body');
-      const countSpan = document.getElementById('campaigns-count');
-      
-      if (!tableBody) return;
-      
-      // Store original data for filtering
-      originalCampaigns = campaigns;
-      
-      // Refresh channel tag filter list with new data
-      populateFilterChannelTagList();
-      
-      // Apply filters and display
-      applyFilters();
     }
     
     // Function to edit campaign from table
@@ -7068,9 +7254,11 @@
           }
         });
         
+        const result = await response.json();
+        
         if (response.ok) {
-          // Remove from local data
-          originalCampaigns = originalCampaigns.filter(c => c._id !== campaignId);
+          // Success - reload table
+          await loadCampaignsTable();
           
           // Clear any radio selection
           const selectedRadio = document.querySelector('input[name="selected_campaign"]:checked');
@@ -7078,31 +7266,18 @@
             selectedRadio.checked = false;
           }
           
-          // Force table refresh with empty state handling
-          if (originalCampaigns.length === 0) {
-            const tableBody = document.getElementById('campaigns-table-body');
-            if (tableBody) {
-              tableBody.innerHTML = '<tr><td colspan="21" class="text-center text-gray-500 py-4">No campaigns found</td></tr>';
-            }
-          }
-          
-          // Refresh the table
-          displayCampaignsTable(originalCampaigns);
-          
-          // Update campaigns count
-          const campaignsCount = document.getElementById('campaigns-count');
-          if (campaignsCount) {
-            campaignsCount.textContent = originalCampaigns.length;
-          }
-          
           // Show delete input for manual deletion of other campaigns
           setDeleteCampaignInputVisibility(true);
           
-          console.log('Campaign deleted, campaigns remaining:', originalCampaigns.length);
+          console.log('Campaign deleted successfully, table reloaded from server');
           alert('Campaign deleted successfully!');
         } else {
-          const error = await response.json();
-          alert(`Failed to delete campaign: ${error.error || 'Unknown error'}`);
+          // Deletion failed - but still reload table to show current state
+          console.error('Campaign deletion failed:', result.error);
+          alert(`Failed to delete campaign: ${result.error || 'Unknown error'}`);
+          
+          // IMPORTANT: Reload table even on failure to sync with database
+          await loadCampaignsTable();
               }
       } catch (error) {
         console.error('Delete campaign error:', error);
@@ -7354,13 +7529,13 @@
           const tr = document.createElement('tr');
           tr.innerHTML = `
             <td>${channel.channel_id || 'N/A'}</td>
-            <td>${channel.channel_type || 'N/A'}</td>
-            <td>${channel.channel_tag || '-'}</td>
-            <td>${channel.add_tag || '-'}</td>
-            <td>${channel.Mobile_no || '-'}</td>
-            <td>${channel.Company_name || '-'}</td>
-            <td>${channel.Tot_impressions || 0}</td>
-            <td>${channel.Tot_conversions || 0}</td>
+            <td>${channel.channelType || 'N/A'}</td>
+            <td>${channel.channelTag || '-'}</td>
+            <td>${channel.addTag || '-'}</td>
+            <td>${channel.mobileNo || '-'}</td>
+            <td>${channel.companyName || '-'}</td>
+            <td>${channel.totImpressions || 0}</td>
+            <td>${channel.totConversions || 0}</td>
             <td>
               <button onclick="editChannel('${channel.channel_id}')" class="btn-primary py-1 px-3 rounded-md text-sm mr-2">Edit</button>
               <button onclick="deleteChannel('${channel.channel_id}')" class="btn-secondary py-1 px-3 rounded-md text-sm" style="background: #EF4444; color: white;">Delete</button>
@@ -7382,13 +7557,13 @@
           currentEditingChannelId = channel.channel_id;
           formTitle.textContent = 'Edit Channel';
           document.getElementById('channelId').value = channel.channel_id;
-          document.getElementById('channelType').value = channel.channel_type || '';
-          document.getElementById('channelTag').value = channel.channel_tag || '';
-          document.getElementById('addTag').value = channel.add_tag || '';
-          document.getElementById('mobileNo').value = channel.Mobile_no || '';
-          document.getElementById('companyName').value = channel.Company_name || '';
-          document.getElementById('totImpressions').value = channel.Tot_impressions || 0;
-          document.getElementById('totConversions').value = channel.Tot_conversions || 0;
+          document.getElementById('channelType').value = channel.channelType || '';
+          document.getElementById('channelTag').value = channel.channelTag || '';
+          document.getElementById('addTag').value = channel.addTag || '';
+          document.getElementById('mobileNo').value = channel.mobileNo || '';
+          document.getElementById('companyName').value = channel.companyName || '';
+          document.getElementById('totImpressions').value = channel.totImpressions || 0;
+          document.getElementById('totConversions').value = channel.totConversions || 0;
         } else {
           // Create mode
           currentEditingChannelId = null;
@@ -7475,16 +7650,16 @@
             } : null
           });
           
-          // Group channels by channel_type and channel_tag
+          // Group channels by channelType and channelTag
           const priorityGroups = {};
           
           channels.forEach(channel => {
-            const key = `${channel.channel_type}${channel.channel_tag ? '::' + channel.channel_tag : ''}`;
+            const key = `${channel.channelType}${channel.channelTag ? '::' + channel.channelTag : ''}`;
             
             if (!priorityGroups[key]) {
               priorityGroups[key] = {
-                channel_type: channel.channel_type,
-                channel_tag: channel.channel_tag || '',
+                channel_type: channel.channelType,
+                channel_tag: channel.channelTag || '',
                 channel_id: channel.channel_id,
                 total_impressions: 0,
                 total_conversions: 0,
@@ -7499,11 +7674,11 @@
                 campaign.channels.forEach(campaignChannel => {
                   // Match by channel type and channel tag
                   // Normalize values for comparison (trim whitespace, handle null/undefined, case-insensitive)
-                  const channelType = (channel.channel_type || '').trim().toLowerCase();
-                  const channelTag = (channel.channel_tag || '').trim().toLowerCase();
+                  const channelType = (channel.channelType || '').trim().toLowerCase();
+                  const channelTag = (channel.channelTag || '').trim().toLowerCase();
                   const campaignType = (campaignChannel.type || '').trim().toLowerCase();
-                  // Check both channelTag and channel_tag field names
-                  const campaignTag = ((campaignChannel.channelTag || campaignChannel.channel_tag || '').toString()).trim().toLowerCase();
+                  // Campaign channels use camelCase: channelTag
+                  const campaignTag = (campaignChannel.channelTag || '').toString().trim().toLowerCase();
                   
                   const typeMatch = channelType && campaignType && channelType === campaignType;
                   // Tag match: if channel has no tag, match any campaign channel; if channel has tag, must match exactly
@@ -7542,8 +7717,8 @@
             try {
               const updates = priorityArray.map(group => ({
                 channel_id: group.channel_id,
-                Tot_impressions: group.total_impressions,
-                Tot_conversions: group.total_conversions
+                totImpressions: group.total_impressions,
+                totConversions: group.total_conversions
               }));
               
               console.log('Sending bulk update for channels:', updates);
@@ -7652,12 +7827,13 @@
           e.preventDefault();
 
           const formData = {
-            channel_type: document.getElementById('channelType').value,
-            channel_tag: document.getElementById('channelTag').value,
-            add_tag: document.getElementById('addTag').value,
-            Mobile_no: document.getElementById('mobileNo').value,
-            Company_name: document.getElementById('companyName').value,
-            Tot_conversions: parseInt(document.getElementById('totConversions').value) || 0
+            channelType: document.getElementById('channelType').value,
+            channelTag: document.getElementById('channelTag').value,
+            addTag: document.getElementById('addTag').value,
+            mobileNo: document.getElementById('mobileNo').value,
+            companyName: document.getElementById('companyName').value,
+            totImpressions: parseInt(document.getElementById('totImpressions').value) || 0,
+            totConversions: parseInt(document.getElementById('totConversions').value) || 0
           };
 
           try {
