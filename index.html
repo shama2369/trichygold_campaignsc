@@ -1188,7 +1188,7 @@
             </div>
             <div class="sm:col-span-2">
               <label for="channelType" class="block text-sm font-medium text-purple-700">Channel Type <span class="text-red-500">*</span></label>
-              <select id="channelType" name="channel_type" required class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+              <select id="channelType" name="channel_type" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
                 <option value="">Select Channel Type</option>
                 <option value="Instagram">Instagram</option>
                 <option value="Facebook">Facebook</option>
@@ -7822,18 +7822,41 @@
         cancelChannelBtn.addEventListener('click', hideChannelForm);
       }
 
-      if (channelForm) {
+      if (channelForm && !channelForm.dataset.listenerAttached) {
+        channelForm.dataset.listenerAttached = 'true';
         channelForm.addEventListener('submit', async (e) => {
           e.preventDefault();
+          e.stopPropagation(); // Prevent event bubbling
 
+          // CLIENT-SIDE VALIDATION: Check channel type before submitting
+          const channelTypeInput = document.getElementById('channelType');
+          if (!channelTypeInput) {
+            console.error('Channel type input not found');
+            alert('⚠️ Error: Channel Type field not found. Please refresh the page.');
+            return;
+          }
+          
+          // Get and validate channel type value
+          const channelType = (channelTypeInput.value || '').trim();
+          
+          // Validate channel type selection (empty string means "Select Channel Type" option is selected)
+          if (!channelType) {
+            alert('⚠️ Please select a Channel Type from the dropdown list. This field is required.');
+            channelTypeInput.focus();
+            // Scroll to the field if needed
+            channelTypeInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return; // Stop here, don't send to server
+          }
+
+          // Safely collect form data with null checks
           const formData = {
-            channelType: document.getElementById('channelType').value,
-            channelTag: document.getElementById('channelTag').value,
-            addTag: document.getElementById('addTag').value,
-            mobileNo: document.getElementById('mobileNo').value,
-            companyName: document.getElementById('companyName').value,
-            totImpressions: parseInt(document.getElementById('totImpressions').value) || 0,
-            totConversions: parseInt(document.getElementById('totConversions').value) || 0
+            channelType: channelType,
+            channelTag: (document.getElementById('channelTag')?.value || '').trim(),
+            addTag: (document.getElementById('addTag')?.value || '').trim(),
+            mobileNo: (document.getElementById('mobileNo')?.value || '').trim(),
+            companyName: (document.getElementById('companyName')?.value || '').trim(),
+            totImpressions: parseInt(document.getElementById('totImpressions')?.value) || 0,
+            totConversions: parseInt(document.getElementById('totConversions')?.value) || 0
           };
 
           try {
