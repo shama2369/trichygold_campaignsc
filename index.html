@@ -1470,7 +1470,7 @@
             <input type="number" class="channelCost p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
           </div>
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelAdType p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="Newspaper Ad">Newspaper Ad</option>
@@ -1519,7 +1519,7 @@
             <input type="number" class="channelCost p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
           </div>
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelAdType p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="Commercial">Commercial</option>
@@ -1552,7 +1552,7 @@
       } else if (type === 'Email') {
         html = `
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelPlatform p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="Newsletter">Newsletter</option>
@@ -1609,6 +1609,11 @@
                 }
               });
               
+              // Explicitly ensure Type field (platformSelect) remains enabled and editable
+              platformSelect.disabled = false;
+              platformSelect.readOnly = false;
+              platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
+              
               // Auto-generate tag when platform is selected
               if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
                 // Create a temporary button element to pass the correct entry reference
@@ -1663,7 +1668,7 @@
             <input type="number" class="channelCost p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
           </div>
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelAdType p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="Festival Spot ad">Festival Spot ad</option>
@@ -1752,7 +1757,7 @@
             <input type="number" class="channelCost p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
           </div>
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelAdType p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="Promotional SMS">Promotional SMS</option>
@@ -1783,7 +1788,7 @@
       } else if (type === 'Outdoor Ads') {
         html = `
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelPlatform p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="Billboard / Hoarding">Billboard / Hoarding</option>
@@ -1833,7 +1838,7 @@
             <input type="number" class="channelCost p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full" min="0" required>
           </div>
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelAdType p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full" required>
               <option value="">Select Type *</option>
               <option value="Instagram Post">Instagram Post</option>
@@ -1876,7 +1881,7 @@
             <input type="number" class="channelCost p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full" min="0" required>
           </div>
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelAdType p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full" required>
               <option value="">Select Type *</option>
               <option value="Facebook Post">Facebook Post</option>
@@ -1993,7 +1998,7 @@
       } else if (type === 'Storefront') {
         html = `
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelPlatform p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="Exterior Brand Signage">Exterior Brand Signage</option>
@@ -2048,6 +2053,11 @@
                 }
               });
               
+              // Explicitly ensure Type field (platformSelect) remains enabled and editable
+              platformSelect.disabled = false;
+              platformSelect.readOnly = false;
+              platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
+              
               // Auto-generate tag when platform is selected
               if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
                 // Create a temporary button element to pass the correct entry reference
@@ -2063,7 +2073,7 @@
       } else if (type === 'YouTube') {
         html = `
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelPlatform p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="YouTube Video">YouTube Video</option>
@@ -2115,6 +2125,11 @@
                 }
               });
               
+              // Explicitly ensure Type field (platformSelect) remains enabled and editable
+              platformSelect.disabled = false;
+              platformSelect.readOnly = false;
+              platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
+              
               // Auto-generate tag when platform is selected
               if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
                 // Create a temporary button element to pass the correct entry reference
@@ -2130,7 +2145,7 @@
       } else if (type === 'WhatsApp Group') {
         html = `
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelPlatform p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="Insta Reel Link Post">Insta Reel Link Post</option>
@@ -2182,6 +2197,11 @@
                 }
               });
               
+              // Explicitly ensure Type field (platformSelect) remains enabled and editable
+              platformSelect.disabled = false;
+              platformSelect.readOnly = false;
+              platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
+              
               // Auto-generate tag when platform is selected
               if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
                 // Create a temporary button element to pass the correct entry reference
@@ -2197,7 +2217,7 @@
       } else if (type === 'Gold councils') {
         html = `
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelPlatform p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="Seasonal/Festive Promotions">Seasonal/Festive Promotions</option>
@@ -2254,6 +2274,11 @@
                   }
                 }
               });
+              
+              // Explicitly ensure Type field (platformSelect) remains enabled and editable
+              platformSelect.disabled = false;
+              platformSelect.readOnly = false;
+              platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
               
               // Auto-generate tag when platform is selected
               if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
@@ -2929,7 +2954,7 @@
             <input type="number" class="channelCost p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full" required>
           </div>
           <div>
-            <label class="block text-sm font-medium text-purple-700">Type</label>
+            <label class="block text-sm font-medium text-purple-700">Platform</label>
             <select class="channelAdType p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
               <option value="">Select Type</option>
               <option value="Snap Ad">Snap Ad</option>
@@ -3043,6 +3068,11 @@
                   }
                 }
               });
+              
+              // Explicitly ensure Type field (platformSelect) remains enabled and editable
+              platformSelect.disabled = false;
+              platformSelect.readOnly = false;
+              platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
               
               // Auto-generate tag when platform is selected
               if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
@@ -4105,7 +4135,7 @@
                   
                   // Ad Type
                   if (channel.adType) {
-                    fields.push({ label: 'Type', value: channel.adType, span: 1 });
+                    fields.push({ label: 'Platform', value: channel.adType, span: 1 });
                   }
                   
                   // Types (multi-select types)
@@ -5442,6 +5472,10 @@
             typeSelect.value = channel.type;
             console.log('Set channel type:', channel.type);
             
+            // Disable channel type in edit mode (not editable)
+            typeSelect.disabled = true;
+            typeSelect.classList.add('bg-gray-100', 'cursor-not-allowed');
+            
             // Store the tag number before updateChannelFields (which might trigger auto-generation)
             const existingTagNumber = channel.tagNumber || '';
             
@@ -5457,6 +5491,10 @@
                 console.log('Set tagNumber AFTER updateChannelFields:', existingTagNumber);
                 // Mark that we're populating to prevent auto-generation
                 tagNumberInput.setAttribute('data-populating', 'true');
+                // Disable reference code in edit mode (not editable)
+                tagNumberInput.disabled = true;
+                tagNumberInput.readOnly = true;
+                tagNumberInput.classList.add('bg-gray-100', 'cursor-not-allowed');
               }
             }, 50);
             
@@ -5530,6 +5568,10 @@
           tagNumberInput.value = channel.tagNumber;
           // Mark as populated to prevent auto-generation
           tagNumberInput.setAttribute('data-populating', 'true');
+          // Disable reference code in edit mode (not editable)
+          tagNumberInput.disabled = true;
+          tagNumberInput.readOnly = true;
+          tagNumberInput.classList.add('bg-gray-100', 'cursor-not-allowed');
         console.log('Set tagNumber:', channel.tagNumber, 'in element:', tagNumberInput);
         } else {
           // Clear the data-populating attribute if no tag exists (allow auto-generation)
@@ -5973,7 +6015,7 @@
         console.log('Total impressions:', stats.totalImpressions); // Debug log
         console.log('Campaigns with impressions:', stats.campaignsWithImpressions); // Debug log
         console.log('Channels by type:', stats.channelsByType); // Debug log
-        console.log('Impressions by platform:', stats.impressionsByPlatform); // Debug log
+        console.log('Platforms by type:', stats.platformsByType); // Debug log
         
         if (stats) {
           displayImpressionStats(stats);
@@ -6056,6 +6098,86 @@
             </table>
           </div>
             ` : '<p class="text-gray-500 text-sm">No channel data available.</p>'}
+              </div>
+          <div class="bg-teal-50 p-4 rounded-lg border border-teal-200">
+            <h4 class="text-lg font-semibold text-teal-700 mb-3">Platform Summary</h4>
+            ${Object.keys(stats.platformsByType || {}).length > 0 ? `
+          <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-teal-200">
+                  <thead class="bg-teal-100">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-teal-700 uppercase tracking-wider">Platform</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-teal-700 uppercase tracking-wider">Total Impressions</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-teal-700 uppercase tracking-wider">Total Conversions</th>
+                </tr>
+              </thead>
+                  <tbody class="bg-white divide-y divide-teal-200">
+                    ${Object.entries(stats.platformsByType || {})
+                      .sort((a, b) => {
+                        // Primary sort: impressions (descending)
+                        if (b[1].impressions !== a[1].impressions) {
+                          return b[1].impressions - a[1].impressions;
+                        }
+                        // Secondary sort: conversions (descending)
+                        return b[1].conversions - a[1].conversions;
+                      })
+                      .map(([platform, data]) => `
+                      <tr>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${platform}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-teal-600">${new Intl.NumberFormat().format(data.impressions || 0)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-teal-600">${new Intl.NumberFormat().format(data.conversions || 0)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+            ` : '<p class="text-gray-500 text-sm">No platform data available.</p>'}
+              </div>
+          <div class="bg-amber-50 p-4 rounded-lg border border-amber-200">
+            <h4 class="text-lg font-semibold text-amber-700 mb-3">Detailed Breakdown (Channel Type, Channel Tag, Platform)</h4>
+            ${(stats.detailedBreakdown && stats.detailedBreakdown.length > 0) ? `
+          <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-amber-200">
+                  <thead class="bg-amber-100">
+                    <tr>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-amber-700 uppercase tracking-wider">Channel Type</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-amber-700 uppercase tracking-wider">Channel Tag</th>
+                      <th class="px-4 py-2 text-left text-xs font-medium text-amber-700 uppercase tracking-wider">Platform</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-amber-700 uppercase tracking-wider">Total Impressions</th>
+                      <th class="px-4 py-2 text-right text-xs font-medium text-amber-700 uppercase tracking-wider">Total Conversions</th>
+                </tr>
+              </thead>
+                  <tbody class="bg-white divide-y divide-amber-200">
+                    ${stats.detailedBreakdown
+                      .sort((a, b) => {
+                        // Primary sort: impressions (descending)
+                        if (b.impressions !== a.impressions) {
+                          return b.impressions - a.impressions;
+                        }
+                        // Secondary sort: conversions (descending)
+                        if (b.conversions !== a.conversions) {
+                          return b.conversions - a.conversions;
+                        }
+                        // Tertiary sort: channel type (ascending)
+                        if (a.channelType !== b.channelType) {
+                          return (a.channelType || '').localeCompare(b.channelType || '');
+                        }
+                        // Quaternary sort: platform (ascending)
+                        return (a.platform || '').localeCompare(b.platform || '');
+                      })
+                      .map((entry) => `
+                      <tr>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">${entry.channelType || 'N/A'}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700">${entry.channelTag || '-'}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-gray-700">${entry.platform || '-'}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-amber-600">${new Intl.NumberFormat().format(entry.impressions || 0)}</td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-amber-600">${new Intl.NumberFormat().format(entry.conversions || 0)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+            ` : '<p class="text-gray-500 text-sm">No detailed breakdown data available.</p>'}
               </div>
           </div>
         `;
@@ -7653,6 +7775,9 @@
           // Group channels by channelType and channelTag
           const priorityGroups = {};
           
+          // Group by channel type, channel tag, and platform for detailed breakdown
+          const platformBreakdown = {};
+          
           channels.forEach(channel => {
             const key = `${channel.channelType}${channel.channelTag ? '::' + channel.channelTag : ''}`;
             
@@ -7696,6 +7821,31 @@
                       priorityGroups[key].marketing_ids.push(campaign.campaignId);
                       priorityGroups[key].marketing_count++;
                     }
+                    
+                    // Track platform breakdown
+                    const platform = campaignChannel.platform || campaignChannel.adType || '';
+                    const platformKey = `${campaignChannel.type || ''}|||${campaignChannel.channelTag || ''}|||${platform}`;
+                    
+                    if (!platformBreakdown[platformKey]) {
+                      platformBreakdown[platformKey] = {
+                        channel_type: campaignChannel.type || '',
+                        channel_tag: campaignChannel.channelTag || '',
+                        platform: platform,
+                        total_impressions: 0,
+                        total_conversions: 0,
+                        marketing_count: 0,
+                        marketing_ids: []
+                      };
+                    }
+                    
+                    platformBreakdown[platformKey].total_impressions += impressions;
+                    platformBreakdown[platformKey].total_conversions += conversions;
+                    
+                    // Track unique marketing records for platform breakdown
+                    if (campaign.campaignId && !platformBreakdown[platformKey].marketing_ids.includes(campaign.campaignId)) {
+                      platformBreakdown[platformKey].marketing_ids.push(campaign.campaignId);
+                      platformBreakdown[platformKey].marketing_count++;
+                    }
                   }
                 });
               }
@@ -7710,6 +7860,22 @@
               return b.total_impressions - a.total_impressions;
             }
             return b.total_conversions - a.total_conversions;
+          });
+          
+          // Convert platform breakdown to array and sort
+          const platformBreakdownArray = Object.values(platformBreakdown).sort((a, b) => {
+            if (b.total_impressions !== a.total_impressions) {
+              return b.total_impressions - a.total_impressions;
+            }
+            if (b.total_conversions !== a.total_conversions) {
+              return b.total_conversions - a.total_conversions;
+            }
+            // Tertiary sort: channel type
+            if (a.channel_type !== b.channel_type) {
+              return (a.channel_type || '').localeCompare(b.channel_type || '');
+            }
+            // Quaternary sort: platform
+            return (a.platform || '').localeCompare(b.platform || '');
           });
           
           // Update channels collection with calculated totals
@@ -7773,7 +7939,8 @@
           }
           
           content.innerHTML = `
-            <div class="overflow-x-auto">
+            <h3 class="text-xl font-semibold text-purple-700 mb-4">Priority Channels by Channel Type & Tag</h3>
+            <div class="overflow-x-auto mb-8">
               <table class="crm-table w-full">
                 <thead>
                   <tr>
@@ -7798,6 +7965,35 @@
                       <td>${group.marketing_ids.join(', ') || '-'}</td>
                     </tr>
                   `).join('')}
+                </tbody>
+              </table>
+            </div>
+            <h3 class="text-xl font-semibold text-purple-700 mb-4 mt-8">Breakdown by Channel Type, Channel Tag & Platform</h3>
+            <div class="overflow-x-auto">
+              <table class="crm-table w-full">
+                <thead>
+                  <tr>
+                    <th class="text-lg font-bold">Channel Type</th>
+                    <th class="text-lg font-bold">Channel Tag</th>
+                    <th class="text-lg font-bold">Platform</th>
+                    <th class="text-lg font-bold">Total Impressions</th>
+                    <th class="text-lg font-bold">Total Conversions</th>
+                    <th class="text-lg font-bold">Marketing Records</th>
+                    <th class="text-lg font-bold">Marketing IDs</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${platformBreakdownArray.length > 0 ? platformBreakdownArray.map(group => `
+                    <tr>
+                      <td>${group.channel_type || 'N/A'}</td>
+                      <td>${group.channel_tag || '-'}</td>
+                      <td>${group.platform || '-'}</td>
+                      <td class="text-right">${new Intl.NumberFormat().format(group.total_impressions)}</td>
+                      <td class="text-right">${new Intl.NumberFormat().format(group.total_conversions)}</td>
+                      <td class="text-right">${group.marketing_count}</td>
+                      <td>${group.marketing_ids.join(', ') || '-'}</td>
+                    </tr>
+                  `).join('') : '<tr><td colspan="7" class="text-center text-gray-500 py-4">No platform breakdown data available</td></tr>'}
                 </tbody>
               </table>
             </div>

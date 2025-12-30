@@ -1909,7 +1909,8 @@ app.get('/api/impressions/stats', async (req, res) => {
       totalImpressions: 0,
       totalConversions: 0,
       channelsByType: {}, // Changed from impressionsByChannel to track both impressions and conversions
-      impressionsByPlatform: {},
+      platformsByType: {}, // Track platforms with both impressions and conversions
+      detailedBreakdown: [], // Track breakdown by channel type, channel tag, and platform
       campaignsWithImpressions: 0
     };
     
@@ -1954,15 +1955,47 @@ app.get('/api/impressions/stats', async (req, res) => {
             stats.channelsByType[channel.type].conversions += conversions;
           }
           
-          if (impressions > 0) {
-            // Track by platform (for Social Media)
-            if (channel.type === 'Social Media' && channel.platform) {
-              if (!stats.impressionsByPlatform[channel.platform]) {
-                stats.impressionsByPlatform[channel.platform] = 0;
-              }
-              stats.impressionsByPlatform[channel.platform] += impressions;
+          // Track by platform (for all channels that have platform/adType)
+          // Some channels use 'platform' field (Email, WhatsApp Group, YouTube, etc.)
+          // Some channels use 'adType' field (Instagram, Facebook, TikTok, etc.)
+          const platformValue = channel.platform || channel.adType;
+          if (platformValue) {
+            if (!stats.platformsByType[platformValue]) {
+              stats.platformsByType[platformValue] = {
+                impressions: 0,
+                conversions: 0
+              };
             }
+            stats.platformsByType[platformValue].impressions += impressions;
+            stats.platformsByType[platformValue].conversions += conversions;
           }
+          
+          // Track detailed breakdown by channel type, channel tag, and platform
+          // This should track ALL channels, regardless of whether they have impressions
+          const channelTag = channel.channelTag || '';
+          const channelType = channel.type || '';
+          const platform = platformValue || '';
+          
+          // Find existing entry or create new one
+          let breakdownEntry = stats.detailedBreakdown.find(entry => 
+            entry.channelType === channelType &&
+            entry.channelTag === channelTag &&
+            entry.platform === platform
+          );
+          
+          if (!breakdownEntry) {
+            breakdownEntry = {
+              channelType: channelType,
+              channelTag: channelTag,
+              platform: platform,
+              impressions: 0,
+              conversions: 0
+            };
+            stats.detailedBreakdown.push(breakdownEntry);
+          }
+          
+          breakdownEntry.impressions += impressions;
+          breakdownEntry.conversions += conversions;
         });
       }
       
@@ -1972,6 +2005,10 @@ app.get('/api/impressions/stats', async (req, res) => {
     });
     
     console.log('Final stats being sent:', stats); // Debug log
+    console.log('Detailed breakdown entries:', stats.detailedBreakdown?.length || 0); // Debug log
+    if (stats.detailedBreakdown && stats.detailedBreakdown.length > 0) {
+      console.log('Sample breakdown entries:', stats.detailedBreakdown.slice(0, 3)); // Debug log
+    }
     res.json(stats);
   } catch (err) {
     console.error('Error getting impression stats:', err);
