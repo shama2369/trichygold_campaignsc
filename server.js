@@ -1689,17 +1689,64 @@ app.get('/api/tags/counters', async (req, res) => {
       return platformMap[prefix] || prefix;
     }
 
-    // Format counters for display
-    const formattedCounters = counters.map(counter => ({
-      prefix: counter.prefix,
-      platformName: getPlatformName(counter.prefix),
-      lastNumber: counter.lastNumber,
-      nextTag: `${counter.prefix}${String(counter.lastNumber + 1).padStart(5, '0')}`
-    }));
+    // Create a map of existing counters by prefix for quick lookup
+    const countersMap = {};
+    counters.forEach(counter => {
+      countersMap[counter.prefix] = counter.lastNumber !== undefined && counter.lastNumber !== null ? counter.lastNumber : 0;
+    });
+
+    // Get all prefixes from platformMap
+    const allPrefixes = Object.keys({
+      'IG': 'Instagram',
+      'FB': 'Facebook', 
+      'TT': 'TikTok',
+      'YT': 'YouTube',
+      'SC': 'Snapchat',
+      'GG': 'Google',
+      'WA': 'WhatsApp Group',
+      'GT': 'Gold councils',
+      'RC': 'Residential Community',
+      'LC': 'Lang/Cultural group',
+      'RG': 'Religious group',
+      'BC': 'Bluecollar Camp',
+      'NC': 'Neighbourhood Community',
+      'SO': 'Social organisations',
+      'EV': 'Event',
+      'EX': 'Exhibition',
+      'CP': 'Channel Partners',
+      'CO': 'Corporate Partners',
+      'HT': 'Hotel',
+      'TD': 'Tour Driver',
+      'TC': 'Tours&Travel Agency',
+      'PL': 'New collection Launch',
+      'WS': 'Website',
+      'EM': 'Email',
+      'SMS': 'SMS',
+      'PM': 'Print Media',
+      'RD': 'Radio',
+      'TV': 'Television',
+      'RF': 'Referral',
+      'SF': 'Storefront',
+      'OA': 'Outdoor Ads',
+      'OT': 'Others'
+    });
+
+    // Format counters for display - include ALL prefixes, even if they don't exist in DB
+    const formattedCounters = allPrefixes.map(prefix => {
+      // Use existing counter value if available, otherwise default to 0
+      const lastNumber = countersMap[prefix] !== undefined ? countersMap[prefix] : 0;
+      
+      return {
+        prefix: prefix,
+        platformName: getPlatformName(prefix),
+        lastNumber: lastNumber,
+        nextTag: `${prefix}${String(lastNumber + 1).padStart(5, '0')}`
+      };
+    });
     
     res.json({
       counters: formattedCounters,
-      count: counters.length
+      count: formattedCounters.length
     });
   } catch (err) {
     console.error('Error getting tag counters:', err);

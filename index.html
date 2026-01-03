@@ -3274,12 +3274,12 @@
               const hasExistingTag = tagNumberInput && tagNumberInput.value && tagNumberInput.value.trim() !== '';
               
               if (isPlatformSelected && !platformSelect.hasAttribute('data-populating') && !hasExistingTag) {
-                // Create a temporary button element to pass the correct entry reference
-                const tempButton = document.createElement('button');
-                tempButton.style.display = 'none';
-                entry.appendChild(tempButton);
-                generateTagNumber(tempButton);
-                entry.removeChild(tempButton);
+          // Create a temporary button element to pass the correct entry reference
+          const tempButton = document.createElement('button');
+          tempButton.style.display = 'none';
+          entry.appendChild(tempButton);
+          generateTagNumber(tempButton);
+          entry.removeChild(tempButton);
               } else if (hasExistingTag) {
                 console.log('Skipping tag generation - tag already exists (existing channel)');
               }
@@ -6294,7 +6294,7 @@
                 input.classList.contains('channelConversions') ||
                 input.classList.contains('channelQty') ||
                 input.classList.contains('channelVenue')) {
-              input.disabled = false;
+          input.disabled = false;
               input.readOnly = false;
               input.classList.remove('bg-gray-100', 'cursor-not-allowed');
             }
@@ -6825,14 +6825,18 @@
       let html = '';
 
       result.counters.forEach(counter => {
+        // Ensure values exist before displaying
+        const lastNumber = counter.lastNumber !== undefined && counter.lastNumber !== null ? counter.lastNumber : 0;
+        const nextTag = counter.nextTag || (counter.prefix ? `${counter.prefix}${String(lastNumber + 1).padStart(5, '0')}` : 'N/A');
+        
         html += `
           <div class="bg-gradient-to-br from-purple-50 to-blue-50 p-4 rounded-lg border border-purple-200">
             <div class="text-center">
-              <div class="text-lg font-bold text-purple-700 mb-1">${counter.prefix}</div>
-              <div class="text-sm text-gray-600 mb-1">${counter.platformName}</div>
-              <div class="text-sm text-gray-600 mb-2">Last Used: ${counter.lastNumber}</div>
+              <div class="text-lg font-bold text-purple-700 mb-1">${counter.prefix || 'N/A'}</div>
+              <div class="text-sm text-gray-600 mb-1">${counter.platformName || counter.prefix || 'Unknown'}</div>
+              <div class="text-sm text-gray-600 mb-2">Last Used: ${lastNumber}</div>
               <div class="text-xs font-mono bg-purple-100 px-2 py-1 rounded">
-                Next: ${counter.nextTag}
+                Next: ${nextTag}
               </div>
             </div>
           </div>
