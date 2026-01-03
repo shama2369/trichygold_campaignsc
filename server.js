@@ -59,7 +59,7 @@ const upload = multer({
       return cb(new Error('Invalid filename. Path traversal not allowed.'), false);
     }
     
-    cb(null, true);
+      cb(null, true);
   }
 });
 
@@ -123,7 +123,7 @@ function validateUploadedFiles(req, res, next) {
       error: 'File validation failed', 
       details: errors 
     });
-  }
+    }
   
   next();
 }
@@ -209,15 +209,15 @@ async function syncTagCounters() {
         
         if (validNumbers.length > 0) {
           const maxNumber = Math.max(...validNumbers);
-          
-          // Update or create counter
-          await tagCounters.updateOne(
-            { prefix: prefix },
-            { $set: { lastNumber: maxNumber } },
-            { upsert: true }
-          );
-          
-          console.log(`Synced counter for ${prefix} to ${maxNumber}`);
+        
+        // Update or create counter
+        await tagCounters.updateOne(
+          { prefix: prefix },
+          { $set: { lastNumber: maxNumber } },
+          { upsert: true }
+        );
+        
+        console.log(`Synced counter for ${prefix} to ${maxNumber}`);
         } else {
           console.warn(`No valid numbers found for prefix ${prefix}, skipping sync`);
         }
@@ -374,13 +374,13 @@ app.post('/api/campaigns', uploadLimiter, upload.fields([
       if (uploadPromises.length > 0) {
         console.log(`Waiting for ${uploadPromises.length} image(s) to upload...`);
         await Promise.all(uploadPromises);
-        if (images.length > 0) {
-          campaignData.images = images;
+      if (images.length > 0) {
+        campaignData.images = images;
           console.log('✓ Images array set in campaignData:', images);
           console.log('✓ campaignData.images after assignment:', campaignData.images);
         } else {
           console.log('⚠ No images were successfully uploaded');
-        }
+      }
       } else {
         console.log('⚠ No image upload promises created');
       }
@@ -438,9 +438,9 @@ app.post('/api/campaigns', uploadLimiter, upload.fields([
           console.log(`Create: Tag counts: ${JSON.stringify(tagCounts)}`);
           
           if (actualDuplicates.length > 0) {
-            return res.status(400).json({ 
+          return res.status(400).json({ 
               error: `Duplicate reference codes found within the campaign: ${actualDuplicates.join(', ')}. Each reference code must be unique.` 
-            });
+          });
           }
         }
         
@@ -491,10 +491,10 @@ app.post('/api/campaigns', uploadLimiter, upload.fields([
     
     try {
       const result = await campaigns.updateOne(
-        { campaignId: campaignData.campaignId },
-        { $set: campaignData },
-        { upsert: true }
-      );
+      { campaignId: campaignData.campaignId },
+      { $set: campaignData },
+      { upsert: true }
+    );
       
       console.log('=== DATABASE SAVE RESULT ===');
       console.log('Matched:', result.matchedCount);
@@ -508,10 +508,10 @@ app.post('/api/campaigns', uploadLimiter, upload.fields([
       console.log('savedCampaign.images type:', typeof savedCampaign?.images);
       console.log('savedCampaign.images isArray:', Array.isArray(savedCampaign?.images));
 
-      // Sync tag counters after save to ensure consistency
-      await syncTagCounters();
-      
-      res.status(200).json({ message: 'Campaign saved successfully', campaignId: campaignData.campaignId });
+    // Sync tag counters after save to ensure consistency
+    await syncTagCounters();
+    
+    res.status(200).json({ message: 'Campaign saved successfully', campaignId: campaignData.campaignId });
     } catch (dbErr) {
       // Handle duplicate key errors (MongoDB error code 11000)
       if (dbErr.code === 11000 || dbErr.codeName === 'DuplicateKey') {
@@ -879,9 +879,9 @@ app.put('/api/campaigns/:campaignId', uploadLimiter, upload.fields([
           console.log(`Update: Tag counts: ${JSON.stringify(tagCounts)}`);
           
           if (actualDuplicates.length > 0) {
-            return res.status(400).json({ 
+          return res.status(400).json({ 
               error: `Duplicate reference codes found within the campaign: ${actualDuplicates.join(', ')}. Each reference code must be unique.` 
-            });
+          });
           }
         }
         
@@ -926,20 +926,20 @@ app.put('/api/campaigns/:campaignId', uploadLimiter, upload.fields([
     console.log('campaignData keys:', Object.keys(campaignData));
     
     try {
-      const result = await campaigns.updateOne(
+    const result = await campaigns.updateOne(
         { _id: objectId },
-        { $set: campaignData },
-        { upsert: false }
-      );
+      { $set: campaignData },
+      { upsert: false }
+    );
       
       console.log('=== DATABASE UPDATE RESULT ===');
       console.log('Matched:', result.matchedCount);
       console.log('Modified:', result.modifiedCount);
-      
-      if (result.matchedCount === 0) {
+    
+    if (result.matchedCount === 0) {
         console.log(`Campaign not found with _id: ${campaignId}`);
-        return res.status(404).json({ error: 'Campaign not found' });
-      }
+      return res.status(404).json({ error: 'Campaign not found' });
+    }
       
       // Verify the updated document
       const updatedCampaign = await campaigns.findOne({ _id: objectId });
@@ -948,13 +948,13 @@ app.put('/api/campaigns/:campaignId', uploadLimiter, upload.fields([
       console.log('updatedCampaign.images type:', typeof updatedCampaign?.images);
       console.log('updatedCampaign.images isArray:', Array.isArray(updatedCampaign?.images));
 
-      // Sync tag counters after update to ensure consistency
-      await syncTagCounters();
-      
-      return res.status(200).json({ 
-        message: 'Campaign updated successfully', 
-        campaignId 
-      });
+    // Sync tag counters after update to ensure consistency
+    await syncTagCounters();
+    
+    return res.status(200).json({ 
+      message: 'Campaign updated successfully', 
+      campaignId 
+    });
     } catch (dbErr) {
       // Handle duplicate key errors (MongoDB error code 11000)
       if (dbErr.code === 11000 || dbErr.codeName === 'DuplicateKey') {
@@ -1157,7 +1157,7 @@ app.get('/api/campaigns/export', async (req, res) => {
   try {
     const campaigns = db.collection('campaigns');
     const data = await campaigns.find().toArray();
-    
+
     const workbook = new excel.Workbook();
     const worksheet = workbook.addWorksheet('Campaigns');
     
@@ -1188,7 +1188,7 @@ app.get('/api/campaigns/export', async (req, res) => {
         channels: ''
       });
     } else {
-      data.forEach(campaign => {
+    data.forEach(campaign => {
       const channelDetails = campaign.channels ? campaign.channels.map(channel => {
         let baseInfo = '';
         if (channel.type === 'Social Media') {
@@ -1224,17 +1224,17 @@ app.get('/api/campaigns/export', async (req, res) => {
         return baseInfo;
       }).join('; ') : '';
       
-        worksheet.addRow({
-          campaignId: campaign.campaignId,
-          name: campaign.name,
-          description: campaign.description,
-          startDate: campaign.startDate,
-          endDate: campaign.endDate,
-          budget: campaign.budget,
-          status: campaign.status,
-          channels: channelDetails,
-        });
+      worksheet.addRow({
+        campaignId: campaign.campaignId,
+        name: campaign.name,
+        description: campaign.description,
+        startDate: campaign.startDate,
+        endDate: campaign.endDate,
+        budget: campaign.budget,
+        status: campaign.status,
+        channels: channelDetails,
       });
+    });
     }
     
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -1268,7 +1268,7 @@ app.get('/api/campaigns/channel-tags', async (req, res) => {
             uniqueTags.add(channel.channelTag.trim());
           }
         });
-      }
+    }
     });
     
     res.json({ tags: Array.from(uniqueTags).sort() });
@@ -1839,7 +1839,7 @@ app.post('/api/tags/generate', async (req, res) => {
         // Newer MongoDB driver format
         allocatedNumber = result.lastNumber;
         console.log('Using result.lastNumber:', allocatedNumber);
-      } else {
+    } else {
         // Fallback: result is null or invalid
         console.error(`findOneAndUpdate returned null or invalid result for prefix ${prefix} (attempt ${attempts})`);
         if (attempts < maxRetries) {
@@ -1859,13 +1859,13 @@ app.post('/api/tags/generate', async (req, res) => {
       
       if (!existingTag) {
         // Tag is available, return it
-        console.log(`Generated unique tag: ${newTagNumber} for ${channelType}${platform ? ' - ' + platform : ''}`);
+      console.log(`Generated unique tag: ${newTagNumber} for ${channelType}${platform ? ' - ' + platform : ''}`);
         return res.json({
-          tagNumber: newTagNumber,
-          prefix: prefix,
+        tagNumber: newTagNumber,
+        prefix: prefix,
           counter: allocatedNumber,
-          shouldIncrement: true
-        });
+        shouldIncrement: true
+      });
       } else {
         // Tag exists (shouldn't happen with atomic increment, but handle it)
         console.warn(`Tag ${newTagNumber} already exists, retrying with next number... (attempt ${attempts})`);
@@ -1954,7 +1954,7 @@ app.get('/api/impressions/stats', async (req, res) => {
             stats.channelsByType[channel.type].impressions += impressions;
             stats.channelsByType[channel.type].conversions += conversions;
           }
-          
+            
           // Track by platform (for all channels that have platform/adType)
           // Some channels use 'platform' field (Email, WhatsApp Group, YouTube, etc.)
           // Some channels use 'adType' field (Instagram, Facebook, TikTok, etc.)
@@ -1965,11 +1965,11 @@ app.get('/api/impressions/stats', async (req, res) => {
                 impressions: 0,
                 conversions: 0
               };
-            }
+              }
             stats.platformsByType[platformValue].impressions += impressions;
             stats.platformsByType[platformValue].conversions += conversions;
-          }
-          
+            }
+            
           // Track detailed breakdown by channel type, channel tag, and platform
           // This should track ALL channels, regardless of whether they have impressions
           const channelTag = channel.channelTag || '';
@@ -2084,7 +2084,7 @@ app.use('/uploads', express.static('uploads'));
 // POST: Create a new channel
 app.post('/api/channels', async (req, res) => {
   try {
-    const { channelType, channelTag, addTag, mobileNo, totConversions, totImpressions, companyName } = req.body;
+    const { channelType, channelTag, addTag, mobileNo, countryCode, totConversions, totImpressions, companyName } = req.body;
     
     // Validate required fields
     if (!channelType) {
@@ -2100,6 +2100,7 @@ app.post('/api/channels', async (req, res) => {
       channelTag: channelTag || '',
       addTag: addTag || '',
       mobileNo: mobileNo || '',
+      countryCode: countryCode || '',
       totConversions: totConversions || 0,
       totImpressions: totImpressions || 0,
       companyName: companyName || '',
@@ -2184,6 +2185,7 @@ app.get('/api/channels/export', async (req, res) => {
       { header: 'Channel Tag', key: 'channelTag', width: 20 },
       { header: 'Add Tag', key: 'addTag', width: 20 },
       { header: 'Mobile No', key: 'mobileNo', width: 15 },
+      { header: 'Country Code', key: 'countryCode', width: 15 },
       { header: 'Company Name', key: 'companyName', width: 25 },
       { header: 'Total Impressions', key: 'totImpressions', width: 15 },
       { header: 'Total Conversions', key: 'totConversions', width: 15 },
@@ -2200,6 +2202,7 @@ app.get('/api/channels/export', async (req, res) => {
         channelTag: '',
         addTag: '',
         mobileNo: '',
+        countryCode: '',
         companyName: '',
         totImpressions: '',
         totConversions: '',
@@ -2448,7 +2451,7 @@ app.get('/api/channels/:id', async (req, res) => {
 app.put('/api/channels/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { channelType, channelTag, addTag, mobileNo, totConversions, totImpressions, companyName } = req.body;
+    const { channelType, channelTag, addTag, mobileNo, countryCode, totConversions, totImpressions, companyName } = req.body;
     
     const channels = db.collection('channels');
     
@@ -2461,6 +2464,7 @@ app.put('/api/channels/:id', async (req, res) => {
     if (channelTag !== undefined) updateData.channelTag = channelTag;
     if (addTag !== undefined) updateData.addTag = addTag;
     if (mobileNo !== undefined) updateData.mobileNo = mobileNo;
+    if (countryCode !== undefined) updateData.countryCode = countryCode;
     if (totConversions !== undefined) updateData.totConversions = totConversions;
     if (totImpressions !== undefined) updateData.totImpressions = totImpressions;
     if (companyName !== undefined) updateData.companyName = companyName;

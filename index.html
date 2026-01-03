@@ -691,6 +691,203 @@
 </div>
 <button id="downloadExcelBtn" class="btn-secondary mt-3 py-2 px-4 rounded-md hidden" onclick="exportQueriedCampaign()">Export Table</button>
 <script>
+        // Country codes array
+        const countryCodes = [
+          { code: '+355', name: 'Albania' },
+          { code: '+213', name: 'Algeria' },
+          { code: '+376', name: 'Andorra' },
+          { code: '+244', name: 'Angola' },
+          { code: '+672', name: 'Antarctica, Christmas Island' },
+          { code: '+54', name: 'Argentina' },
+          { code: '+374', name: 'Armenia' },
+          { code: '+297', name: 'Aruba' },
+          { code: '+61', name: 'Australia' },
+          { code: '+43', name: 'Austria' },
+          { code: '+994', name: 'Azerbaijan' },
+          { code: '+973', name: 'Bahrain' },
+          { code: '+880', name: 'Bangladesh' },
+          { code: '+375', name: 'Belarus' },
+          { code: '+32', name: 'Belgium' },
+          { code: '+501', name: 'Belize' },
+          { code: '+229', name: 'Benin' },
+          { code: '+975', name: 'Bhutan' },
+          { code: '+591', name: 'Bolivia' },
+          { code: '+387', name: 'Bosnia & Herzegovina' },
+          { code: '+267', name: 'Botswana' },
+          { code: '+55', name: 'Brazil' },
+          { code: '+246', name: 'British Indian Ocean Territory' },
+          { code: '+673', name: 'Brunei' },
+          { code: '+359', name: 'Bulgaria' },
+          { code: '+226', name: 'Burkina Faso' },
+          { code: '+257', name: 'Burundi' },
+          { code: '+855', name: 'Cambodia' },
+          { code: '+237', name: 'Cameroon' },
+          { code: '+1', name: 'USA Canada etc' },
+          { code: '+238', name: 'Cape Verde' },
+          { code: '+235', name: 'Chad' },
+          { code: '+56', name: 'Chile' },
+          { code: '+86', name: 'China' },
+          { code: '+57', name: 'Colombia' },
+          { code: '+269', name: 'Comoros' },
+          { code: '+242', name: 'Congo' },
+          { code: '+243', name: 'DR Congo' },
+          { code: '+506', name: 'Costa Rica' },
+          { code: '+385', name: 'Croatia' },
+          { code: '+53', name: 'Cuba' },
+          { code: '+599', name: 'Curacao Bonaire etc' },
+          { code: '+357', name: 'Cyprus' },
+          { code: '+420', name: 'Czech Republic' },
+          { code: '+45', name: 'Denmark' },
+          { code: '+253', name: 'Djibouti' },
+          { code: '+593', name: 'Ecuador' },
+          { code: '+20', name: 'Egypt' },
+          { code: '+503', name: 'El Salvador' },
+          { code: '+240', name: 'Equatorial Guinea' },
+          { code: '+291', name: 'Eritrea' },
+          { code: '+372', name: 'Estonia' },
+          { code: '+251', name: 'Ethiopia' },
+          { code: '+298', name: 'Faroe Islands' },
+          { code: '+679', name: 'Fiji' },
+          { code: '+358', name: 'Finland' },
+          { code: '+33', name: 'France' },
+          { code: '+594', name: 'French Guiana' },
+          { code: '+689', name: 'French Polynesia' },
+          { code: '+241', name: 'Gabon' },
+          { code: '+220', name: 'Gambia' },
+          { code: '+995', name: 'Georgia' },
+          { code: '+49', name: 'Germany' },
+          { code: '+233', name: 'Ghana' },
+          { code: '+350', name: 'Gibraltar' },
+          { code: '+30', name: 'Greece' },
+          { code: '+299', name: 'Greenland' },
+          { code: '+590', name: 'Guadeloupe' },
+          { code: '+224', name: 'Guinea' },
+          { code: '+245', name: 'Guinea-Bissau' },
+          { code: '+592', name: 'Guyana' },
+          { code: '+509', name: 'Haiti' },
+          { code: '+504', name: 'Honduras' },
+          { code: '+852', name: 'Hong Kong' },
+          { code: '+36', name: 'Hungary' },
+          { code: '+354', name: 'Iceland' },
+          { code: '+91', name: 'India' },
+          { code: '+62', name: 'Indonesia' },
+          { code: '+98', name: 'Iran' },
+          { code: '+964', name: 'Iraq' },
+          { code: '+353', name: 'Ireland' },
+          { code: '+972', name: 'Israel' },
+          { code: '+39', name: 'Italy' },
+          { code: '+225', name: 'Ivory Coast' },
+          { code: '+81', name: 'Japan' },
+          { code: '+962', name: 'Jordan' },
+          { code: '+7', name: 'Russia Kazakhstan' },
+          { code: '+254', name: 'Kenya' },
+          { code: '+686', name: 'Kiribati' },
+          { code: '+383', name: 'Kosovo' },
+          { code: '+965', name: 'Kuwait' },
+          { code: '+996', name: 'Kyrgyzstan' },
+          { code: '+856', name: 'Laos' },
+          { code: '+371', name: 'Latvia' },
+          { code: '+961', name: 'Lebanon' },
+          { code: '+266', name: 'Lesotho' },
+          { code: '+231', name: 'Liberia' },
+          { code: '+218', name: 'Libya' },
+          { code: '+423', name: 'Liechtenstein' },
+          { code: '+370', name: 'Lithuania' },
+          { code: '+352', name: 'Luxembourg' },
+          { code: '+853', name: 'Macau' },
+          { code: '+261', name: 'Madagascar' },
+          { code: '+265', name: 'Malawi' },
+          { code: '+60', name: 'Malaysia' },
+          { code: '+960', name: 'Maldives' },
+          { code: '+223', name: 'Mali' },
+          { code: '+356', name: 'Malta' },
+          { code: '+692', name: 'Marshall Islands' },
+          { code: '+596', name: 'Martinique' },
+          { code: '+222', name: 'Mauritania' },
+          { code: '+230', name: 'Mauritius' },
+          { code: '+52', name: 'Mexico' },
+          { code: '+691', name: 'Micronesia' },
+          { code: '+373', name: 'Moldova' },
+          { code: '+377', name: 'Monaco' },
+          { code: '+976', name: 'Mongolia' },
+          { code: '+382', name: 'Montenegro' },
+          { code: '+258', name: 'Mozambique' },
+          { code: '+95', name: 'Myanmar' },
+          { code: '+264', name: 'Namibia' },
+          { code: '+674', name: 'Nauru' },
+          { code: '+977', name: 'Nepal' },
+          { code: '+31', name: 'Netherlands' },
+          { code: '+687', name: 'New Caledonia' },
+          { code: '+64', name: 'New Zealand' },
+          { code: '+505', name: 'Nicaragua' },
+          { code: '+227', name: 'Niger' },
+          { code: '+234', name: 'Nigeria' },
+          { code: '+683', name: 'Niue' },
+          { code: '+850', name: 'North Korea' },
+          { code: '+389', name: 'North Macedonia' },
+          { code: '+47', name: 'Norway' },
+          { code: '+968', name: 'Oman' },
+          { code: '+680', name: 'Palau' },
+          { code: '+970', name: 'Palestine' },
+          { code: '+507', name: 'Panama' },
+          { code: '+675', name: 'Papua New Guinea' },
+          { code: '+595', name: 'Paraguay' },
+          { code: '+92', name: 'Pakistan' },
+          { code: '+51', name: 'Peru' },
+          { code: '+63', name: 'Philippines' },
+          { code: '+48', name: 'Poland' },
+          { code: '+351', name: 'Portugal' },
+          { code: '+974', name: 'Qatar' },
+          { code: '+262', name: 'Reunion' },
+          { code: '+40', name: 'Romania' },
+          { code: '+966', name: 'Saudi Arabia' },
+          { code: '+381', name: 'Serbia' },
+          { code: '+248', name: 'Seychelles' },
+          { code: '+232', name: 'Sierra Leone' },
+          { code: '+65', name: 'Singapore' },
+          { code: '+421', name: 'Slovakia' },
+          { code: '+386', name: 'Slovenia' },
+          { code: '+677', name: 'Solomon Islands' },
+          { code: '+252', name: 'Somalia' },
+          { code: '+27', name: 'South Africa' },
+          { code: '+82', name: 'South Korea' },
+          { code: '+211', name: 'South Sudan' },
+          { code: '+34', name: 'Spain' },
+          { code: '+94', name: 'Sri Lanka' },
+          { code: '+290', name: 'Saint Helena' },
+          { code: '+508', name: 'Saint Pierre & Miquelon' },
+          { code: '+249', name: 'Sudan' },
+          { code: '+597', name: 'Suriname' },
+          { code: '+268', name: 'Swaziland' },
+          { code: '+46', name: 'Sweden' },
+          { code: '+41', name: 'Switzerland' },
+          { code: '+963', name: 'Syria' },
+          { code: '+886', name: 'Taiwan' },
+          { code: '+992', name: 'Tajikistan' },
+          { code: '+255', name: 'Tanzania' },
+          { code: '+66', name: 'Thailand' },
+          { code: '+228', name: 'Togo' },
+          { code: '+690', name: 'Tokelau' },
+          { code: '+676', name: 'Tonga' },
+          { code: '+216', name: 'Tunisia' },
+          { code: '+90', name: 'Turkey' },
+          { code: '+993', name: 'Turkmenistan' },
+          { code: '+688', name: 'Tuvalu' },
+          { code: '+256', name: 'Uganda' },
+          { code: '+380', name: 'Ukraine' },
+          { code: '+971', name: 'UAE' },
+          { code: '+44', name: 'UK' },
+          { code: '+598', name: 'Uruguay' },
+          { code: '+998', name: 'Uzbekistan' },
+          { code: '+678', name: 'Vanuatu' },
+          { code: '+58', name: 'Venezuela' },
+          { code: '+84', name: 'Vietnam' },
+          { code: '+681', name: 'Wallis & Futuna' },
+          { code: '+967', name: 'Yemen' },
+          { code: '+260', name: 'Zambia' },
+          { code: '+263', name: 'Zimbabwe' }
+        ];
+
         // Helper to show/hide query campaign input section
         function setQueryCampaignInputVisibility(visible) {
           const manualInput = document.getElementById('queryManualEntryContainer');
@@ -1162,6 +1359,7 @@
                 <th class="text-lg font-bold">Channel Type</th>
                 <th class="text-lg font-bold">Channel Tag</th>
                 <th class="text-lg font-bold">Add Tag</th>
+                <th class="text-lg font-bold">Country Code</th>
                 <th class="text-lg font-bold">Mobile No</th>
                 <th class="text-lg font-bold">Company Name</th>
                 <th class="text-lg font-bold">Total Impressions</th>
@@ -1231,6 +1429,12 @@
             <div>
               <label for="addTag" class="block text-sm font-medium text-purple-700">Add Tag</label>
               <input id="addTag" name="add_tag" type="text" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full" placeholder="Optional">
+            </div>
+            <div>
+              <label for="countryCode" class="block text-sm font-medium text-purple-700">Country Code</label>
+              <select id="countryCode" name="country_code" class="p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 w-full">
+                <option value="">Select Country Code</option>
+              </select>
             </div>
             <div>
               <label for="mobileNo" class="block text-sm font-medium text-purple-700">Mobile No</label>
@@ -1615,13 +1819,19 @@
               platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
               
               // Auto-generate tag when platform is selected
-              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
+              // But don't generate if tag already has a value (existing channel being edited)
+              const tagNumberInput = entry.querySelector('.channelTagNumber');
+              const hasExistingTag = tagNumberInput && tagNumberInput.value && tagNumberInput.value.trim() !== '';
+              
+              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating') && !hasExistingTag) {
                 // Create a temporary button element to pass the correct entry reference
                 const tempButton = document.createElement('button');
                 tempButton.style.display = 'none';
                 entry.appendChild(tempButton);
                 generateTagNumber(tempButton);
                 entry.removeChild(tempButton);
+              } else if (hasExistingTag) {
+                console.log('Skipping tag generation - tag already exists (existing channel)');
               }
             });
           }
@@ -2059,13 +2269,19 @@
               platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
               
               // Auto-generate tag when platform is selected
-              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
+              // But don't generate if tag already has a value (existing channel being edited)
+              const tagNumberInput = entry.querySelector('.channelTagNumber');
+              const hasExistingTag = tagNumberInput && tagNumberInput.value && tagNumberInput.value.trim() !== '';
+              
+              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating') && !hasExistingTag) {
                 // Create a temporary button element to pass the correct entry reference
                 const tempButton = document.createElement('button');
                 tempButton.style.display = 'none';
                 entry.appendChild(tempButton);
                 generateTagNumber(tempButton);
                 entry.removeChild(tempButton);
+              } else if (hasExistingTag) {
+                console.log('Skipping tag generation - tag already exists (existing channel)');
               }
             });
           }
@@ -2131,13 +2347,19 @@
               platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
               
               // Auto-generate tag when platform is selected
-              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
+              // But don't generate if tag already has a value (existing channel being edited)
+              const tagNumberInput = entry.querySelector('.channelTagNumber');
+              const hasExistingTag = tagNumberInput && tagNumberInput.value && tagNumberInput.value.trim() !== '';
+              
+              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating') && !hasExistingTag) {
                 // Create a temporary button element to pass the correct entry reference
                 const tempButton = document.createElement('button');
                 tempButton.style.display = 'none';
                 entry.appendChild(tempButton);
                 generateTagNumber(tempButton);
                 entry.removeChild(tempButton);
+              } else if (hasExistingTag) {
+                console.log('Skipping tag generation - tag already exists (existing channel)');
               }
             });
           }
@@ -2203,13 +2425,19 @@
               platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
               
               // Auto-generate tag when platform is selected
-              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
+              // But don't generate if tag already has a value (existing channel being edited)
+              const tagNumberInput = entry.querySelector('.channelTagNumber');
+              const hasExistingTag = tagNumberInput && tagNumberInput.value && tagNumberInput.value.trim() !== '';
+              
+              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating') && !hasExistingTag) {
                 // Create a temporary button element to pass the correct entry reference
                 const tempButton = document.createElement('button');
                 tempButton.style.display = 'none';
                 entry.appendChild(tempButton);
                 generateTagNumber(tempButton);
                 entry.removeChild(tempButton);
+              } else if (hasExistingTag) {
+                console.log('Skipping tag generation - tag already exists (existing channel)');
               }
             });
           }
@@ -2281,13 +2509,19 @@
               platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
               
               // Auto-generate tag when platform is selected
-              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
+              // But don't generate if tag already has a value (existing channel being edited)
+              const tagNumberInput = entry.querySelector('.channelTagNumber');
+              const hasExistingTag = tagNumberInput && tagNumberInput.value && tagNumberInput.value.trim() !== '';
+              
+              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating') && !hasExistingTag) {
                 // Create a temporary button element to pass the correct entry reference
                 const tempButton = document.createElement('button');
                 tempButton.style.display = 'none';
                 entry.appendChild(tempButton);
                 generateTagNumber(tempButton);
                 entry.removeChild(tempButton);
+              } else if (hasExistingTag) {
+                console.log('Skipping tag generation - tag already exists (existing channel)');
               }
             });
           }
@@ -2875,12 +3109,17 @@
             });
             
             // Auto-generate tag when at least one type is selected
-            if (hasSelection && !entry.hasAttribute('data-populating')) {
+            // But don't generate if tag already has a value (existing channel being edited)
+            const hasExistingTag = tagNumberInput && tagNumberInput.value && tagNumberInput.value.trim() !== '';
+            
+            if (hasSelection && !entry.hasAttribute('data-populating') && !hasExistingTag) {
               const tempButton = document.createElement('button');
               tempButton.style.display = 'none';
               entry.appendChild(tempButton);
               generateTagNumber(tempButton);
               entry.removeChild(tempButton);
+            } else if (hasExistingTag) {
+              console.log('Skipping tag generation - tag already exists (existing channel)');
             }
           }
           
@@ -3030,13 +3269,19 @@
               });
               
               // Auto-generate tag when platform is selected
-              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
-          // Create a temporary button element to pass the correct entry reference
-          const tempButton = document.createElement('button');
-          tempButton.style.display = 'none';
-          entry.appendChild(tempButton);
-          generateTagNumber(tempButton);
-          entry.removeChild(tempButton);
+              // But don't generate if tag already has a value (existing channel being edited)
+              const tagNumberInput = entry.querySelector('.channelTagNumber');
+              const hasExistingTag = tagNumberInput && tagNumberInput.value && tagNumberInput.value.trim() !== '';
+              
+              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating') && !hasExistingTag) {
+                // Create a temporary button element to pass the correct entry reference
+                const tempButton = document.createElement('button');
+                tempButton.style.display = 'none';
+                entry.appendChild(tempButton);
+                generateTagNumber(tempButton);
+                entry.removeChild(tempButton);
+              } else if (hasExistingTag) {
+                console.log('Skipping tag generation - tag already exists (existing channel)');
               }
             });
           }
@@ -3052,11 +3297,10 @@
               const platform = this.value;
               const allInputs = entry.querySelectorAll('input, select');
               const isPlatformSelected = platform && platform !== '';
+              const tagNumberInput = entry.querySelector('.channelTagNumber');
+              const channelTypeSelect = entry.querySelector('.channelType');
               
               allInputs.forEach(input => {
-                const tagNumberInput = entry.querySelector('.channelTagNumber');
-                const channelTypeSelect = entry.querySelector('.channelType');
-                
                 // Skip platform select, channel type select, and tag number input
                 if (input !== platformSelect && input !== channelTypeSelect && input !== tagNumberInput) {
                   input.disabled = !isPlatformSelected;
@@ -3075,13 +3319,34 @@
               platformSelect.classList.remove('bg-gray-100', 'cursor-not-allowed');
               
               // Auto-generate tag when platform is selected
-              if (isPlatformSelected && !platformSelect.hasAttribute('data-populating')) {
+              // But don't generate if tag already has a value (existing channel being edited)
+              const hasExistingTag = tagNumberInput && tagNumberInput.value && tagNumberInput.value.trim() !== '';
+              const isPopulating = platformSelect.hasAttribute('data-populating');
+              
+              console.log('Outdoor Ads platform changed:', {
+                platform: platformSelect.value,
+                isPlatformSelected,
+                hasExistingTag,
+                isPopulating,
+                tagValue: tagNumberInput?.value
+              });
+              
+              if (isPlatformSelected && !isPopulating && !hasExistingTag) {
+                console.log('Generating tag for Outdoor Ads...');
                 // Create a temporary button element to pass the correct entry reference
                 const tempButton = document.createElement('button');
                 tempButton.style.display = 'none';
                 entry.appendChild(tempButton);
                 generateTagNumber(tempButton);
                 entry.removeChild(tempButton);
+              } else {
+                if (hasExistingTag) {
+                  console.log('Skipping tag generation - tag already exists (existing channel):', tagNumberInput.value);
+                } else if (isPopulating) {
+                  console.log('Skipping tag generation - platform is being populated');
+                } else if (!isPlatformSelected) {
+                  console.log('Skipping tag generation - no platform selected');
+                }
               }
             });
           }
@@ -3092,19 +3357,29 @@
       // BUT ONLY if no tag number already exists (to preserve existing tags during edit)
       if (type && type !== 'Storefront' && type !== 'Email' && type !== 'YouTube' && type !== 'WhatsApp Group' && type !== 'Gold councils' && type !== 'Outdoor Ads') {
         setTimeout(() => {
-          // Check if tag number already exists or is being populated - if so, don't generate a new one
+          // Check if tag number already exists - if so, don't generate a new one (existing channel)
           const tagNumberInput = entry.querySelector('.channelTagNumber');
           if (tagNumberInput) {
-            // Check if tag already has a value
+            // Check if tag already has a value (existing channel being edited)
             if (tagNumberInput.value && tagNumberInput.value.trim() !== '') {
               console.log('Tag number already exists, skipping auto-generation:', tagNumberInput.value);
               return; // Don't generate if tag already exists
             }
-            // Check if we're currently populating (during edit)
-            if (tagNumberInput.hasAttribute('data-populating')) {
-              console.log('Tag number is being populated, skipping auto-generation');
-              return; // Don't generate if we're populating
+            // Only skip if we're populating AND tag has a value (being populated with existing data)
+            if (tagNumberInput.hasAttribute('data-populating') && tagNumberInput.value && tagNumberInput.value.trim() !== '') {
+              console.log('Tag number is being populated with existing value, skipping auto-generation');
+              return;
             }
+          }
+          
+          // Check if entry is being populated with existing data (has data-populating AND tag has value)
+          if (entry.hasAttribute('data-populating')) {
+            const tagInput = entry.querySelector('.channelTagNumber');
+            if (tagInput && tagInput.value && tagInput.value.trim() !== '') {
+              console.log('Entry is being populated with existing channel, skipping auto-generation');
+              return; // Don't generate if entry is being populated with existing data
+            }
+            // If data-populating but no tag value, it's a new channel being added in edit mode - allow generation
           }
           
           // Verify the channelType is still set before generating tag
@@ -5479,16 +5754,22 @@
             // Store the tag number before updateChannelFields (which might trigger auto-generation)
             const existingTagNumber = channel.tagNumber || '';
             
+            // Mark entry as being populated to prevent auto-generation during edit
+            channelEntry.setAttribute('data-populating', 'true');
+            
             // Update channel fields to show the correct inputs
             updateChannelFields(typeSelect);
             
-            // IMPORTANT: Set tag number IMMEDIATELY after updateChannelFields
-            // Use a small delay to ensure the input exists, but before auto-generation timeout (150ms)
+            // Fill values after fields are updated
+            fillChannelEntryValues(channelEntry, channel);
+            
+            // IMPORTANT: Set tag number AFTER fillChannelEntryValues for Referral channels
+            // Use a delay to ensure the input exists and checkboxes are processed
             setTimeout(() => {
               const tagNumberInput = channelEntry.querySelector('.channelTagNumber');
               if (tagNumberInput && existingTagNumber) {
                 tagNumberInput.value = existingTagNumber;
-                console.log('Set tagNumber AFTER updateChannelFields:', existingTagNumber);
+                console.log('Set tagNumber AFTER fillChannelEntryValues:', existingTagNumber);
                 // Mark that we're populating to prevent auto-generation
                 tagNumberInput.setAttribute('data-populating', 'true');
                 // Disable reference code in edit mode (not editable)
@@ -5496,10 +5777,25 @@
                 tagNumberInput.readOnly = true;
                 tagNumberInput.classList.add('bg-gray-100', 'cursor-not-allowed');
               }
-            }, 50);
-            
-            // Fill values after fields are updated
-            fillChannelEntryValues(channelEntry, channel);
+              
+              // Fix: Re-enable platform-dependent fields if platform is already selected (edit mode)
+              const platformSelect = channelEntry.querySelector('.channelPlatform');
+              if (platformSelect && platformSelect.value) {
+                // Platform is already selected, so enable the fields that depend on it
+                const editableFields = channelEntry.querySelectorAll(
+                  '.channelAdName, .channelCost, .channelImpressions, .channelConversions'
+                );
+                editableFields.forEach(field => {
+                  field.disabled = false;
+                  field.readOnly = false;
+                  field.classList.remove('bg-gray-100', 'cursor-not-allowed');
+                });
+                console.log('Re-enabled platform-dependent fields for edit mode');
+              }
+              
+              // Remove data-populating from entry after tag is set
+              channelEntry.removeAttribute('data-populating');
+            }, 200);
           }
           
           // Set channel tag
@@ -5528,6 +5824,12 @@
     function fillChannelEntryValues(channelEntry, channel) {
       console.log('Filling channel entry values:', channel);
       console.log('Channel entry element:', channelEntry);
+      
+      // Mark entry as being populated to prevent auto-generation during edit
+      const isPopulating = channelEntry.hasAttribute('data-populating');
+      if (!isPopulating) {
+        channelEntry.setAttribute('data-populating', 'true');
+      }
       
       // Fill in common fields
       const adNameInput = channelEntry.querySelector('.channelAdName');
@@ -5560,25 +5862,6 @@
         console.log('Set conversions:', channel.conversions, 'in element:', conversionsInput);
       } else {
         console.log('Conversions input not found');
-      }
-      
-      const tagNumberInput = channelEntry.querySelector('.channelTagNumber');
-      if (tagNumberInput) {
-        if (channel.tagNumber && channel.tagNumber.trim() !== '') {
-          tagNumberInput.value = channel.tagNumber;
-          // Mark as populated to prevent auto-generation
-          tagNumberInput.setAttribute('data-populating', 'true');
-          // Disable reference code in edit mode (not editable)
-          tagNumberInput.disabled = true;
-          tagNumberInput.readOnly = true;
-          tagNumberInput.classList.add('bg-gray-100', 'cursor-not-allowed');
-        console.log('Set tagNumber:', channel.tagNumber, 'in element:', tagNumberInput);
-        } else {
-          // Clear the data-populating attribute if no tag exists (allow auto-generation)
-          tagNumberInput.removeAttribute('data-populating');
-        }
-      } else {
-        console.log('TagNumber input not found');
       }
       
       // Fill in channel-specific fields based on type
@@ -5742,6 +6025,20 @@
           // Trigger the platform change event to enable/disable fields
           const event = new Event('change', { bubbles: true });
           platformSelect.dispatchEvent(event);
+          
+          // Also explicitly enable fields if platform is set (for edit mode)
+          if (platformSelect.value) {
+            setTimeout(() => {
+              const editableFields = channelEntry.querySelectorAll(
+                '.channelAdName, .channelCost, .channelImpressions, .channelConversions'
+              );
+              editableFields.forEach(field => {
+                field.disabled = false;
+                field.readOnly = false;
+                field.classList.remove('bg-gray-100', 'cursor-not-allowed');
+              });
+            }, 100);
+          }
         }
       } else if (channel.type === 'YouTube') {
         console.log('Processing YouTube channel...');
@@ -5754,6 +6051,20 @@
           // Trigger the platform change event to enable/disable fields
           const event = new Event('change', { bubbles: true });
           platformSelect.dispatchEvent(event);
+          
+          // Also explicitly enable fields if platform is set (for edit mode)
+          if (platformSelect.value) {
+            setTimeout(() => {
+              const editableFields = channelEntry.querySelectorAll(
+                '.channelAdName, .channelCost, .channelImpressions, .channelConversions'
+              );
+              editableFields.forEach(field => {
+                field.disabled = false;
+                field.readOnly = false;
+                field.classList.remove('bg-gray-100', 'cursor-not-allowed');
+              });
+            }, 100);
+          }
         }
       } else if (channel.type === 'WhatsApp Group') {
         console.log('Processing WhatsApp Group channel...');
@@ -5766,6 +6077,20 @@
           // Trigger the platform change event to enable/disable fields
           const event = new Event('change', { bubbles: true });
           platformSelect.dispatchEvent(event);
+          
+          // Also explicitly enable fields if platform is set (for edit mode)
+          if (platformSelect.value) {
+            setTimeout(() => {
+              const editableFields = channelEntry.querySelectorAll(
+                '.channelAdName, .channelCost, .channelImpressions, .channelConversions'
+              );
+              editableFields.forEach(field => {
+                field.disabled = false;
+                field.readOnly = false;
+                field.classList.remove('bg-gray-100', 'cursor-not-allowed');
+              });
+            }, 100);
+          }
         }
       } else if (channel.type === 'Email') {
         console.log('Processing Email channel...');
@@ -5778,6 +6103,20 @@
           // Trigger the platform change event to enable/disable fields
           const event = new Event('change', { bubbles: true });
           platformSelect.dispatchEvent(event);
+          
+          // Also explicitly enable fields if platform is set (for edit mode)
+          if (platformSelect.value) {
+            setTimeout(() => {
+              const editableFields = channelEntry.querySelectorAll(
+                '.channelAdName, .channelCost, .channelQty, .channelImpressions, .channelConversions'
+              );
+              editableFields.forEach(field => {
+                field.disabled = false;
+                field.readOnly = false;
+                field.classList.remove('bg-gray-100', 'cursor-not-allowed');
+              });
+            }, 100);
+          }
         }
         
         const qtyInput = channelEntry.querySelector('.channelQty');
@@ -5798,6 +6137,20 @@
           // Trigger the platform change event to enable/disable fields if needed
           const event = new Event('change', { bubbles: true });
           platformSelect.dispatchEvent(event);
+          
+          // Also explicitly enable fields if platform is set (for edit mode)
+          if (platformSelect.value) {
+            setTimeout(() => {
+              const editableFields = channelEntry.querySelectorAll(
+                '.channelAdName, .channelCost, .channelImpressions, .channelConversions'
+              );
+              editableFields.forEach(field => {
+                field.disabled = false;
+                field.readOnly = false;
+                field.classList.remove('bg-gray-100', 'cursor-not-allowed');
+              });
+            }, 100);
+          }
         }
       } else if (channel.type === 'Referral') {
         console.log('Processing Referral channel...');
@@ -5812,9 +6165,23 @@
             }
           });
           // Trigger change event on first checked checkbox to enable fields
+          // But don't trigger if we're populating (to prevent auto-tag generation)
           const firstChecked = Array.from(checkboxes).find(cb => cb.checked);
-          if (firstChecked) {
+          if (firstChecked && !channelEntry.hasAttribute('data-populating')) {
             firstChecked.dispatchEvent(new Event('change', { bubbles: true }));
+          } else if (firstChecked) {
+            // If populating, manually enable fields without triggering tag generation
+            const allInputs = channelEntry.querySelectorAll('input, select');
+            const tagNumberInput = channelEntry.querySelector('.channelTagNumber');
+            const channelTagInput = channelEntry.querySelector('.channelTag');
+            const channelTypeSelect = channelEntry.querySelector('.channelType');
+            allInputs.forEach(input => {
+              const isCheckbox = Array.from(channelEntry.querySelectorAll('.channelTypeCheckbox')).includes(input);
+              if (!isCheckbox && input !== channelTypeSelect && input !== channelTagInput && input !== tagNumberInput) {
+                input.disabled = false;
+                input.classList.remove('bg-gray-100');
+              }
+            });
           }
         } else if (channel.platform) {
           // Backward compatibility: if old data has platform, try to match it
@@ -5822,7 +6189,22 @@
           const matchingCheckbox = Array.from(checkboxes).find(cb => cb.value === channel.platform);
           if (matchingCheckbox) {
             matchingCheckbox.checked = true;
-            matchingCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+            if (!channelEntry.hasAttribute('data-populating')) {
+              matchingCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+            } else {
+              // If populating, manually enable fields without triggering tag generation
+              const allInputs = channelEntry.querySelectorAll('input, select');
+              const tagNumberInput = channelEntry.querySelector('.channelTagNumber');
+              const channelTagInput = channelEntry.querySelector('.channelTag');
+              const channelTypeSelect = channelEntry.querySelector('.channelType');
+              allInputs.forEach(input => {
+                const isCheckbox = Array.from(channelEntry.querySelectorAll('.channelTypeCheckbox')).includes(input);
+                if (!isCheckbox && input !== channelTypeSelect && input !== channelTagInput && input !== tagNumberInput) {
+                  input.disabled = false;
+                  input.classList.remove('bg-gray-100');
+                }
+              });
+            }
           }
         }
       } else if (channel.type === 'Event' || channel.type === 'Exhibition' || channel.type === 'New collection Launch' || channel.type === 'Channel Partners' || channel.type === 'Corporate Partners' || channel.type === 'Hotel' || channel.type === 'Tour Driver' || channel.type === 'Tours&Travel Agency' || channel.type === 'Website' || ['Residential Community', 'Lang/Cultural group', 'Religious group', 'Bluecollar Camp', 'Neighbourhood Community', 'Social organisations'].includes(channel.type)) {
@@ -5849,6 +6231,20 @@
           // Trigger the platform change event to enable/disable fields
           const event = new Event('change', { bubbles: true });
           platformSelect.dispatchEvent(event);
+          
+          // Also explicitly enable fields if platform is set (for edit mode)
+          if (platformSelect.value) {
+            setTimeout(() => {
+              const editableFields = channelEntry.querySelectorAll(
+                '.channelAdName, .channelCost, .channelVenue, .channelImpressions, .channelConversions'
+              );
+              editableFields.forEach(field => {
+                field.disabled = false;
+                field.readOnly = false;
+                field.classList.remove('bg-gray-100', 'cursor-not-allowed');
+              });
+            }, 100);
+          }
         }
         
         const venueInput = channelEntry.querySelector('.channelVenue');
@@ -5864,15 +6260,57 @@
         console.log('Processing Promotional Offer channel...');
       }
       
+      // Set tag number AFTER all fields are populated (especially for Referral channels)
+      const tagNumberInput = channelEntry.querySelector('.channelTagNumber');
+      if (tagNumberInput && channel.tagNumber && channel.tagNumber.trim() !== '') {
+        tagNumberInput.value = channel.tagNumber;
+        // Mark as populated to prevent auto-generation
+        tagNumberInput.setAttribute('data-populating', 'true');
+        // Disable reference code in edit mode (not editable)
+        tagNumberInput.disabled = true;
+        tagNumberInput.readOnly = true;
+        tagNumberInput.classList.add('bg-gray-100', 'cursor-not-allowed');
+        console.log('Set tagNumber in fillChannelEntryValues:', channel.tagNumber);
+      } else if (tagNumberInput && (!channel.tagNumber || channel.tagNumber.trim() === '')) {
+        // Clear the data-populating attribute if no tag exists (allow auto-generation)
+        tagNumberInput.removeAttribute('data-populating');
+      }
+      
       // Enable all fields after setting values (for edit mode)
+      // But preserve disabled state for channelType and channelTagNumber (which should remain disabled in edit mode)
       const allInputs = channelEntry.querySelectorAll('input, select');
+      const channelTypeSelect = channelEntry.querySelector('.channelType');
+      // tagNumberInput already declared above
+      
       allInputs.forEach(input => {
-        if (input !== channelEntry.querySelector('.channelType') && 
-            input !== channelEntry.querySelector('.channelTagNumber')) {
-          input.disabled = false;
-          input.classList.remove('bg-gray-100');
+        if (input !== channelTypeSelect && input !== tagNumberInput) {
+          // Check if this is a platform-dependent field that should be enabled if platform is selected
+          const platformSelect = channelEntry.querySelector('.channelPlatform');
+          if (platformSelect && platformSelect.value) {
+            // Platform is selected, so enable platform-dependent fields
+            if (input.classList.contains('channelAdName') ||
+                input.classList.contains('channelCost') ||
+                input.classList.contains('channelImpressions') ||
+                input.classList.contains('channelConversions') ||
+                input.classList.contains('channelQty') ||
+                input.classList.contains('channelVenue')) {
+              input.disabled = false;
+              input.readOnly = false;
+              input.classList.remove('bg-gray-100', 'cursor-not-allowed');
+            }
+          } else if (!platformSelect) {
+            // No platform select means fields are not platform-dependent, enable them
+            input.disabled = false;
+            input.readOnly = false;
+            input.classList.remove('bg-gray-100', 'cursor-not-allowed');
+          }
         }
       });
+      
+      // Remove data-populating attribute after population is complete
+      if (!isPopulating) {
+        channelEntry.removeAttribute('data-populating');
+      }
       
       // Force a re-render to ensure values are visible
       channelEntry.style.display = 'none';
@@ -5899,6 +6337,20 @@
       const tagInput = entry.querySelector('.channelTagNumber');
       if (!tagInput) {
         console.error('Tag input not found in entry');
+        return;
+      }
+      
+      // Check if tag already has a value - if so, don't generate (it's an existing channel being edited)
+      const hasExistingTag = tagInput.value && tagInput.value.trim() !== '';
+      if (hasExistingTag) {
+        console.log('Skipping tag generation - tag already has value (existing channel):', tagInput.value);
+        return;
+      }
+      
+      // Check if entry has data-populating attribute (being populated during edit)
+      // Only skip if tag already has a value, otherwise allow generation for new channels
+      if (entry.hasAttribute('data-populating') && hasExistingTag) {
+        console.log('Skipping tag generation - entry is being populated and tag exists');
         return;
       }
       
@@ -6127,10 +6579,10 @@
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-teal-600">${new Intl.NumberFormat().format(data.impressions || 0)}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-teal-600">${new Intl.NumberFormat().format(data.conversions || 0)}</td>
                   </tr>
-                `).join('')}
+            `).join('')}
               </tbody>
             </table>
-          </div>
+                </div>
             ` : '<p class="text-gray-500 text-sm">No platform data available.</p>'}
               </div>
           <div class="bg-amber-50 p-4 rounded-lg border border-amber-200">
@@ -6173,7 +6625,7 @@
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-amber-600">${new Intl.NumberFormat().format(entry.impressions || 0)}</td>
                         <td class="px-4 py-2 whitespace-nowrap text-sm text-right font-semibold text-amber-600">${new Intl.NumberFormat().format(entry.conversions || 0)}</td>
                   </tr>
-                `).join('')}
+              `).join('')}
               </tbody>
             </table>
           </div>
@@ -7654,6 +8106,7 @@
             <td>${channel.channelType || 'N/A'}</td>
             <td>${channel.channelTag || '-'}</td>
             <td>${channel.addTag || '-'}</td>
+            <td>${channel.countryCode || '-'}</td>
             <td>${channel.mobileNo || '-'}</td>
             <td>${channel.companyName || '-'}</td>
             <td>${channel.totImpressions || 0}</td>
@@ -7667,12 +8120,32 @@
         });
       }
 
+      // Populate country code dropdown
+      function populateCountryCodeDropdown() {
+        const countryCodeSelect = document.getElementById('countryCode');
+        if (!countryCodeSelect) return;
+        
+        // Clear existing options except the first one
+        countryCodeSelect.innerHTML = '<option value="">Select Country Code</option>';
+        
+        // Add all country codes
+        countryCodes.forEach(country => {
+          const option = document.createElement('option');
+          option.value = country.code;
+          option.textContent = `${country.code} - ${country.name}`;
+          countryCodeSelect.appendChild(option);
+        });
+      }
+
       // Show channel form
       function showChannelForm(channel = null) {
         const formSection = document.getElementById('channel-form-section');
         const tableSection = document.getElementById('channel-table-section');
         const formTitle = document.getElementById('channel-form-title');
         const form = document.getElementById('channelForm');
+
+        // Populate country code dropdown if not already populated
+        populateCountryCodeDropdown();
 
         if (channel) {
           // Edit mode
@@ -7686,12 +8159,42 @@
           document.getElementById('companyName').value = channel.companyName || '';
           document.getElementById('totImpressions').value = channel.totImpressions || 0;
           document.getElementById('totConversions').value = channel.totConversions || 0;
+          
+          // Set country code AFTER dropdown is populated (with small delay to ensure DOM is ready)
+          // Use multiple attempts to ensure it's set correctly
+          const setCountryCode = () => {
+            const countryCodeSelect = document.getElementById('countryCode');
+            if (countryCodeSelect && channel.countryCode) {
+              countryCodeSelect.value = channel.countryCode;
+              console.log('Set country code in edit mode:', channel.countryCode);
+              // If value didn't set, it means the option doesn't exist - log for debugging
+              if (countryCodeSelect.value !== channel.countryCode) {
+                console.warn('Country code value not found in dropdown:', channel.countryCode);
+                // Try to find and select the option manually
+                const options = Array.from(countryCodeSelect.options);
+                const matchingOption = options.find(opt => opt.value === channel.countryCode);
+                if (matchingOption) {
+                  countryCodeSelect.value = channel.countryCode;
+                  console.log('Country code set via manual option match');
+                }
+              }
+            }
+          };
+          
+          // Try immediately
+          setCountryCode();
+          
+          // Also try after a small delay to ensure dropdown is fully populated
+          setTimeout(setCountryCode, 50);
+          setTimeout(setCountryCode, 100);
         } else {
           // Create mode
           currentEditingChannelId = null;
           formTitle.textContent = 'Create New Channel';
           form.reset();
           document.getElementById('channelId').value = '';
+          // Re-populate country code dropdown after reset
+          populateCountryCodeDropdown();
         }
 
         tableSection.classList.add('hidden');
@@ -7786,6 +8289,7 @@
                 channel_type: channel.channelType,
                 channel_tag: channel.channelTag || '',
                 channel_id: channel.channel_id,
+                add_tag: channel.addTag || '',
                 total_impressions: 0,
                 total_conversions: 0,
                 marketing_count: 0,
@@ -7831,6 +8335,7 @@
                         channel_type: campaignChannel.type || '',
                         channel_tag: campaignChannel.channelTag || '',
                         platform: platform,
+                        add_tag: channel.addTag || '',
                         total_impressions: 0,
                         total_conversions: 0,
                         marketing_count: 0,
@@ -7854,12 +8359,22 @@
           
           console.log('Priority Groups Result:', priorityGroups);
           
-          // Convert to array and sort by total impressions (descending)
+          // Convert to array and sort by channel type, then channel tag, then add tag, then channel ID
           const priorityArray = Object.values(priorityGroups).sort((a, b) => {
-            if (b.total_impressions !== a.total_impressions) {
-              return b.total_impressions - a.total_impressions;
+            // Primary sort: channel type (ascending)
+            if (a.channel_type !== b.channel_type) {
+              return (a.channel_type || '').localeCompare(b.channel_type || '');
             }
-            return b.total_conversions - a.total_conversions;
+            // Secondary sort: channel tag (ascending)
+            if (a.channel_tag !== b.channel_tag) {
+              return (a.channel_tag || '').localeCompare(b.channel_tag || '');
+            }
+            // Tertiary sort: add tag (ascending)
+            if (a.add_tag !== b.add_tag) {
+              return (a.add_tag || '').localeCompare(b.add_tag || '');
+            }
+            // Quaternary sort: channel ID / reference code (ascending)
+            return (a.channel_id || '').localeCompare(b.channel_id || '');
           });
           
           // Convert platform breakdown to array and sort
@@ -7947,6 +8462,7 @@
                     <th class="text-lg font-bold">Channel ID</th>
                     <th class="text-lg font-bold">Channel Type</th>
                     <th class="text-lg font-bold">Channel Tag</th>
+                    <th class="text-lg font-bold">Add Tag</th>
                     <th class="text-lg font-bold">Total Impressions</th>
                     <th class="text-lg font-bold">Total Conversions</th>
                     <th class="text-lg font-bold">Marketing Records</th>
@@ -7959,6 +8475,7 @@
                       <td>${group.channel_id || 'N/A'}</td>
                       <td>${group.channel_type || 'N/A'}</td>
                       <td>${group.channel_tag || '-'}</td>
+                      <td>${group.add_tag || '-'}</td>
                       <td class="text-right">${new Intl.NumberFormat().format(group.total_impressions)}</td>
                       <td class="text-right">${new Intl.NumberFormat().format(group.total_conversions)}</td>
                       <td class="text-right">${group.marketing_count}</td>
@@ -7975,6 +8492,7 @@
                   <tr>
                     <th class="text-lg font-bold">Channel Type</th>
                     <th class="text-lg font-bold">Channel Tag</th>
+                    <th class="text-lg font-bold">Add Tag</th>
                     <th class="text-lg font-bold">Platform</th>
                     <th class="text-lg font-bold">Total Impressions</th>
                     <th class="text-lg font-bold">Total Conversions</th>
@@ -7987,13 +8505,14 @@
                     <tr>
                       <td>${group.channel_type || 'N/A'}</td>
                       <td>${group.channel_tag || '-'}</td>
+                      <td>${group.add_tag || '-'}</td>
                       <td>${group.platform || '-'}</td>
                       <td class="text-right">${new Intl.NumberFormat().format(group.total_impressions)}</td>
                       <td class="text-right">${new Intl.NumberFormat().format(group.total_conversions)}</td>
                       <td class="text-right">${group.marketing_count}</td>
                       <td>${group.marketing_ids.join(', ') || '-'}</td>
                     </tr>
-                  `).join('') : '<tr><td colspan="7" class="text-center text-gray-500 py-4">No platform breakdown data available</td></tr>'}
+                  `).join('') : '<tr><td colspan="8" class="text-center text-gray-500 py-4">No platform breakdown data available</td></tr>'}
                 </tbody>
               </table>
             </div>
@@ -8050,6 +8569,7 @@
             channelTag: (document.getElementById('channelTag')?.value || '').trim(),
             addTag: (document.getElementById('addTag')?.value || '').trim(),
             mobileNo: (document.getElementById('mobileNo')?.value || '').trim(),
+            countryCode: (document.getElementById('countryCode')?.value || '').trim(),
             companyName: (document.getElementById('companyName')?.value || '').trim(),
             totImpressions: parseInt(document.getElementById('totImpressions')?.value) || 0,
             totConversions: parseInt(document.getElementById('totConversions')?.value) || 0
